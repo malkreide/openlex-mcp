@@ -12,6 +12,10 @@
 
 > MCP-Server für die Zürcher Gesetzessammlung (ZH-Lex) — Volltextsuche, Artikelextraktion und Bildungsrecht-Tools für ~970 kantonale Gesetze
 
+<p align="center">
+  <img src="assets/demo.png" alt="Demo: Claude durchsucht Zürcher Bildungsrecht via MCP Tool Call" width="720">
+</p>
+
 ---
 
 ## Übersicht
@@ -238,6 +242,21 @@ openlex-mcp/
 - **Erststart:** Erster Start benötigt ~25s zum Herunterladen und Indexieren von 974 Gesetzen von HuggingFace (~38 MB SQLite-Datenbank)
 - **zh.ch-Metadaten:** Keine offizielle API; Metadaten-Extraktion basiert auf HTML-Mustern, die sich ändern können
 - **Offline-Modus:** Volltextsuche funktioniert offline nach Erststart; Live-Metadaten benötigen Internet
+
+---
+
+## Sicherheit & Limiten
+
+| Aspekt | Details |
+|--------|---------|
+| **Zugriff** | Nur lesend (`readOnlyHint: true`) — der Server kann keine Daten ändern oder löschen |
+| **Personendaten** | Keine Personendaten — alle Quellen sind aggregierte, öffentliche Gesetzestexte |
+| **Rate Limits** | Eingebaute Limits pro Abfrage (max. 50 Suchergebnisse, 5000 Zeichen Inhaltsvorschau) |
+| **Timeout** | 30 Sekunden pro HTTP-Aufruf an zh.ch |
+| **Authentifizierung** | Kein API-Schlüssel erforderlich — HuggingFace-Datensatz ist öffentlich, zh.ch ist offen |
+| **Lizenzen** | Gesetzesdaten: CC-BY-SA 4.0 ([rcds/swiss_legislation](https://huggingface.co/datasets/rcds/swiss_legislation)); zh.ch-Metadaten: öffentlich |
+| **Nutzungsbedingungen** | Unterliegt den Nutzungsbedingungen von [HuggingFace](https://huggingface.co/terms-of-service) und [Kanton Zürich](https://www.zh.ch/de/rechtliche-hinweise.html) |
+| **Haftungsausschluss** | Dieser Server stellt Gesetzestexte ausschliesslich zu Informationszwecken bereit — er ersetzt keine Rechtsberatung |
 
 ---
 

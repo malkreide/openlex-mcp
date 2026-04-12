@@ -12,6 +12,10 @@
 
 [🇩🇪 Deutsche Version](README.de.md)
 
+<p align="center">
+  <img src="assets/demo.png" alt="Demo: Claude searches Zurich education law via MCP tool call" width="720">
+</p>
+
 ---
 
 ## Overview
@@ -238,6 +242,21 @@ openlex-mcp/
 - **Initial load:** First start requires ~25s to download and index 974 laws from HuggingFace (~38 MB SQLite database)
 - **zh.ch metadata:** No official API; metadata extraction relies on HTML patterns that may change
 - **Offline mode:** Full-text search works offline after initial load; live metadata requires internet
+
+---
+
+## Safety & Limits
+
+| Aspect | Details |
+|--------|---------|
+| **Access** | Read-only (`readOnlyHint: true`) — the server cannot modify or delete any data |
+| **Personal data** | No personal data — all sources are aggregated, public legal texts |
+| **Rate limits** | Built-in per-query caps (max 50 search results, 5000 chars content preview) |
+| **Timeout** | 30 seconds per HTTP call to zh.ch |
+| **Authentication** | No API keys required — HuggingFace dataset is public, zh.ch is open |
+| **Licenses** | Law data: CC-BY-SA 4.0 ([rcds/swiss_legislation](https://huggingface.co/datasets/rcds/swiss_legislation)); zh.ch metadata: public |
+| **Terms of Service** | Subject to ToS of [HuggingFace](https://huggingface.co/terms-of-service) and [Canton Zurich](https://www.zh.ch/de/rechtliche-hinweise.html) |
+| **Disclaimer** | This server provides legal texts for informational purposes only — it does not constitute legal advice |
 
 ---
 

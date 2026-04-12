@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440, initial-scale=1.0">
+<title>openlex-mcp Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 40px;
+    width: 1440px;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #16213e;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .header {
+    background: linear-gradient(135deg, #0f3460, #533483);
+    padding: 20px 30px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .header .icon { font-size: 28px; }
+  .header h1 { font-size: 18px; font-weight: 600; color: #fff; }
+  .header .badge {
+    background: rgba(255,255,255,0.15);
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    color: #ccc;
+    margin-left: auto;
+  }
+  .chat { padding: 24px 30px; }
+  .msg { margin-bottom: 20px; }
+  .msg.user {
+    background: #1a1a3e;
+    border-left: 3px solid #e94560;
+    padding: 14px 18px;
+    border-radius: 0 10px 10px 0;
+  }
+  .msg.user .label { color: #e94560; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .msg.user p { color: #f0f0f0; font-size: 15px; line-height: 1.5; }
+  .tool-call {
+    background: #0a1628;
+    border: 1px solid #2a3a5e;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12.5px;
+  }
+  .tool-call .fn {
+    color: #7b68ee;
+    font-weight: 700;
+  }
+  .tool-call .param { color: #4ecdc4; }
+  .tool-call .val { color: #f7dc6f; }
+  .tool-call .label {
+    color: #666;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+    font-family: -apple-system, sans-serif;
+  }
+  .msg.assistant {
+    padding: 0 4px;
+  }
+  .msg.assistant .label { color: #4ecdc4; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+  .result-card {
+    background: #111b33;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 8px;
+    border-left: 3px solid #7b68ee;
+  }
+  .result-card .title { color: #fff; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .result-card .meta { color: #888; font-size: 12px; line-height: 1.6; }
+  .result-card .meta strong { color: #aaa; }
+  .result-card .snippet {
+    color: #999;
+    font-size: 12px;
+    margin-top: 6px;
+    font-style: italic;
+    line-height: 1.5;
+  }
+  .result-card .snippet em { color: #f7dc6f; font-style: normal; font-weight: 600; }
+  .result-header {
+    color: #ccc;
+    font-size: 13px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #2a3a5e;
+  }
+  .result-header strong { color: #fff; }
+  .footer {
+    background: #0a1628;
+    padding: 12px 30px;
+    text-align: center;
+    color: #555;
+    font-size: 11px;
+    border-top: 1px solid #1a2a4e;
+  }
+  .footer a { color: #7b68ee; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <span class="icon">&#9878;&#65039;</span>
+    <h1>openlex-mcp</h1>
+    <span class="badge">8 Tools &middot; 974 Laws &middot; FTS5</span>
+  </div>
+
+  <div class="chat">
+    <div class="msg user">
+      <div class="label">User</div>
+      <p>Which Zurich education laws mention &laquo;Schulleitung&raquo;?</p>
+    </div>
+
+    <div class="tool-call">
+      <div class="label">MCP Tool Call</div>
+      <span class="fn">zhlaw_find_education_laws</span>(<span class="param">query</span>=<span class="val">"Schulleitung"</span>, <span class="param">limit</span>=<span class="val">5</span>)
+    </div>
+
+    <div class="msg assistant">
+      <div class="label">Response &mdash; Bildungsrecht (412.x)</div>
+      <div class="result-header"><strong>5 results</strong> in education law (LS 412.x)</div>
+
+      <div class="result-card">
+        <div class="title">1. Volksschulverordnung (VSV)</div>
+        <div class="meta"><strong>LS 412.101</strong> &middot; In Kraft &middot; seit 2021-01-01</div>
+        <div class="snippet">&hellip; <em>Schulleitung</em> und Lehrpersonen k&ouml;nnen Sch&uuml;lerinnen und Sch&uuml;lern untersagen, gef&auml;hrliche Gegenst&auml;nde in die Schulanlagen mitzubringen &hellip;</div>
+      </div>
+
+      <div class="result-card">
+        <div class="title">2. Volksschulgesetz (VSG)</div>
+        <div class="meta"><strong>LS 412.100</strong> &middot; In Kraft &middot; seit 2023-01-01</div>
+        <div class="snippet">&hellip; Anstellung und Entlassung der <em>Schulleitung</em>, der Lehrpersonen und der &uuml;brigen Mitarbeitenden sowie deren Zuteilung an die Schulen &hellip;</div>
+      </div>
+
+      <div class="result-card">
+        <div class="title">3. Verordnung &uuml;ber die sonderp&auml;dagogischen Massnahmen (VSM)</div>
+        <div class="meta"><strong>LS 412.103</strong> &middot; In Kraft &middot; seit 2022-01-01</div>
+        <div class="snippet">&hellip; unterbreiten die Lehrpersonen und die Eltern der <em>Schulleitung</em> einen Vorschlag f&uuml;r die anzuordnende Massnahme &hellip;</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <a href="https://github.com/malkreide/openlex-mcp">github.com/malkreide/openlex-mcp</a> &middot; Canton Zurich Legislation &middot; CC-BY-SA 4.0
+  </div>
+</div>
+</body>
+</html>
