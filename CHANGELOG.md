@@ -10,17 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-04-12
 
 ### Added
-- Initial release
-- 8 MCP tools for Canton Zurich legislation
-- `zhlaw_search_laws` — full-text search across ~970 cantonal laws (SQLite FTS5 with BM25 ranking)
-- `zhlaw_get_law` — retrieve law by LS number (e.g., `412.100`) or abbreviation (e.g., `VSG`)
-- `zhlaw_get_article` — extract individual articles from law texts with paragraph detection
-- `zhlaw_list_laws` — list and filter laws by legal area prefix
-- `zhlaw_find_education_laws` — specialized search in education law (LS 412.x series)
-- `zhlaw_search_articles` — search within all articles of a specific law
-- `zhlaw_get_law_metadata` — live metadata from zh.ch (PDF links, validity status)
-- `zhlaw_update_cache` — refresh local cache from HuggingFace
-- Local SQLite + FTS5 cache with automatic HuggingFace data loading
-- Article parser supporting Art./paragraph notation and superscript digits
+- Initial release with 8 MCP tools for Canton Zurich legislation
+- **Search tools**: `zhlaw_search_laws`, `zhlaw_list_laws`, `zhlaw_find_education_laws`
+- **Retrieval tools**: `zhlaw_get_law`, `zhlaw_get_law_metadata`
+- **Article tools**: `zhlaw_get_article`, `zhlaw_search_articles`
+- **Cache tools**: `zhlaw_update_cache`
+- Local SQLite + FTS5 cache with automatic HuggingFace data loading (974 ZH laws)
+- Article parser supporting Art./§ notation and superscript paragraph digits
 - Hybrid architecture: cached full-text (HuggingFace) + live metadata (zh.ch)
-- Dual transport support: stdio (local) and streamable-http (cloud)
+- Dual transport: stdio (Claude Desktop) + Streamable HTTP (cloud)
+- Bilingual documentation (EN/DE)

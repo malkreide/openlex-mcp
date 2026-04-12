@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "openlex": {
+      "command": "python",
+      "args": ["-m", "openlex_mcp.server"]
+    }
+  }
+}
