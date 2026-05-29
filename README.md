@@ -75,9 +75,20 @@ uv pip install -e .
 # stdio (for Claude Desktop)
 python -m openlex_mcp.server
 
-# Streamable HTTP (port 8000)
+# Streamable HTTP — binds to 127.0.0.1:8000 by default (localhost only)
 python -m openlex_mcp.server --http --port 8000
 ```
+
+### Network binding
+
+By default the HTTP transport binds to **`127.0.0.1`** (localhost only). The host
+and port are configurable via the `MCP_HOST` / `MCP_PORT` environment variables
+(or the `--host` / `--port` CLI flags, which take precedence).
+
+**Never** bind to `0.0.0.0` outside a container — it exposes the server to your
+local network (NeighborJack risk). For containerized/cloud deployments set
+`MCP_HOST=0.0.0.0` explicitly; when that happens outside a detected container the
+server logs a warning.
 
 Try it immediately in Claude Desktop:
 
@@ -129,7 +140,10 @@ For use via **claude.ai in the browser** (e.g. on managed workstations without l
 1. Push/fork the repository to GitHub
 2. On [render.com](https://render.com): New Web Service → connect GitHub repo
 3. Set start command: `python -m openlex_mcp.server --http --port 8000`
-4. In claude.ai under Settings → MCP Servers, add: `https://your-app.onrender.com/sse`
+4. Set environment variable `MCP_HOST=0.0.0.0` so the container is reachable
+   (the code default is `127.0.0.1`; Render sets the `RENDER` env var, so no
+   NeighborJack warning is logged)
+5. In claude.ai under Settings → MCP Servers, add: `https://your-app.onrender.com/sse`
 
 > 💡 *"stdio for the developer laptop, SSE for the browser."*
 

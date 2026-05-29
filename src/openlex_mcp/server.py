@@ -18,8 +18,9 @@ Transport: stdio (lokal) und streamable-http (Cloud)
 
 from __future__ import annotations
 
+import logging
+import os
 import sys
-from enum import StrEnum
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, ConfigDict, Field
@@ -832,14 +833,55 @@ async def zhlaw_update_cache(params: UpdateCacheInput) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _in_container() -> bool:
+    """Heuristik: läuft der Prozess in einem Container / Cloud-Runtime?"""
+    return bool(
+        os.path.exists("/.dockerenv")
+        or os.environ.get("KUBERNETES_SERVICE_HOST")
+        or os.environ.get("RENDER")
+        or os.environ.get("RAILWAY_PROJECT_ID")
+    )
+
+
+def _warn_on_public_binding(host: str) -> None:
+    """Warnt, wenn ausserhalb eines Containers an alle Interfaces gebunden wird.
+
+    Ein 0.0.0.0-Binding auf einem Laptop im öffentlichen WLAN macht den
+    Server für alle Geräte im Subnetz erreichbar (NeighborJack, SEC-016).
+    """
+    if host in ("0.0.0.0", "::") and not _in_container():
+        logging.warning(
+            "Binding to %s outside a container context exposes the MCP "
+            "server to the local network (NeighborJack risk). Use "
+            "MCP_HOST=127.0.0.1 for local development.",
+            host,
+        )
+
+
+def _resolve_http_host_port() -> tuple[str, int]:
+    """Ermittelt Host/Port für den HTTP-Transport.
+
+    Reihenfolge: CLI-Argument (--host/--port) > Environment
+    (MCP_HOST/MCP_PORT) > sicherer Default (127.0.0.1:8000).
+    0.0.0.0 wird niemals als Code-Default gesetzt — Container müssen
+    MCP_HOST=0.0.0.0 explizit setzen (siehe README / Dockerfile).
+    """
+    host = os.environ.get("MCP_HOST", "127.0.0.1")
+    port = int(os.environ.get("MCP_PORT", "8000"))
+    for i, arg in enumerate(sys.argv):
+        if arg == "--host" and i + 1 < len(sys.argv):
+            host = sys.argv[i + 1]
+        if arg == "--port" and i + 1 < len(sys.argv):
+            port = int(sys.argv[i + 1])
+    return host, port
+
+
 def main():
     """Startet den MCP-Server mit Dual-Transport (stdio oder streamable-http)."""
     if "--http" in sys.argv:
-        port = 8000
-        for i, arg in enumerate(sys.argv):
-            if arg == "--port" and i + 1 < len(sys.argv):
-                port = int(sys.argv[i + 1])
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
+        host, port = _resolve_http_host_port()
+        _warn_on_public_binding(host)
+        mcp.run(transport="streamable-http", host=host, port=port)
     else:
         mcp.run()
 

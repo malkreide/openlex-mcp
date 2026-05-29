@@ -26,7 +26,8 @@ ZHLEX_BASE = "https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessam
 LEXFIND_BASE = "https://www.lexfind.ch"
 
 REQUEST_TIMEOUT = 30.0
-USER_AGENT = "openlex-mcp/0.1.0 (Kanton Zürich Rechtssammlung MCP Server)"
+# HTTP-Header müssen ASCII sein (httpx lehnt Umlaute ab) — daher "Zuerich".
+USER_AGENT = "openlex-mcp/0.1.0 (Kanton Zuerich Rechtssammlung MCP Server)"
 
 # ZH-Lex URL-Muster für Ordnungsnummern
 # Konvertierung: 412.100 → 412_100
