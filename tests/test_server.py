@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
@@ -60,6 +61,28 @@ async def test_search_articles(server_with_cache):
         srv.SearchArticlesInput(law_identifier="VSG", query="Eltern")
     )
     assert "Art. 28" in out
+
+
+# ---------------------------------------------------------------------------
+# SDK-003: context injection — progress reports and info messages
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_update_cache_reports_progress_and_info(server_with_cache):
+    ctx = MagicMock()
+    ctx.info = AsyncMock()
+    ctx.warning = AsyncMock()
+    ctx.report_progress = AsyncMock()
+
+    out = await srv.zhlaw_update_cache(ctx, srv.UpdateCacheInput(force=False))
+
+    # Must have called info() at least once (start message).
+    ctx.info.assert_called()
+    # Must have called report_progress() to signal start and completion.
+    assert ctx.report_progress.call_count >= 2
+    # Result should still contain the normal status text.
+    assert "Cache" in out
 
 
 # ---------------------------------------------------------------------------
