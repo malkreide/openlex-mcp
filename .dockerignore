@@ -1,0 +1,35 @@
+# Version control
+.git
+.gitignore
+
+# Python byte-code and caches
+__pycache__
+*.py[cod]
+*.pyo
+.pytest_cache
+.ruff_cache
+*.egg-info
+dist/
+build/
+
+# Tests and development files
+tests/
+audits/
+docs/
+assets/
+
+# Config / secrets
+.env
+*.env.*
+claude_desktop_config.json
+
+# CI
+.github/
+
+# SQLite data files (loaded at runtime from HuggingFace)
+*.db
+*.sqlite
+
+# Editor / OS artefacts
+.DS_Store
+*.swp
