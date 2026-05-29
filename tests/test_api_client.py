@@ -46,6 +46,17 @@ def test_handle_error_timeout():
     assert "Zeit" in msg or "erneut" in msg
 
 
+def test_handle_error_masks_unexpected_exception():
+    # OBS-002: the catch-all must not leak the exception type or message.
+    msg = api_client.handle_error(
+        RuntimeError("raw sql error: SELECT * FROM laws WHERE secret=1"), "Test"
+    )
+    assert "SELECT" not in msg
+    assert "secret" not in msg
+    assert "RuntimeError" not in msg
+    assert "unerwartet" in msg.lower()
+
+
 @respx.mock
 @pytest.mark.asyncio
 async def test_fetch_zhlex_metadata_success():

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **OBS-001 / OBS-002**: tool execution errors are now surfaced as masked
+  `isError` results (via `ToolError`) instead of being returned as plain text.
+  The catch-all error handler no longer leaks the exception type/message to the
+  LLM; the original error (with traceback) is logged to **stderr** only. Logging
+  is now explicitly configured to stderr in `main()` (`LOG_LEVEL` env override),
+  keeping stdout reserved for the JSON-RPC stream (OBS-004). Legitimate
+  "not found" / "no results" responses remain normal guidance results.
+
 ### Security
 - **SEC-016**: HTTP transport now defaults to `127.0.0.1` instead of hardcoded
   `0.0.0.0`. Host/port are configurable via `MCP_HOST`/`MCP_PORT` env vars (or
