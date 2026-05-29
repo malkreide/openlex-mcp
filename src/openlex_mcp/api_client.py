@@ -18,6 +18,8 @@ import re
 
 import httpx
 
+from openlex_mcp import net
+
 # ---------------------------------------------------------------------------
 # Konstanten
 # ---------------------------------------------------------------------------
@@ -81,10 +83,12 @@ _client: httpx.AsyncClient | None = None
 
 
 def _build_client() -> httpx.AsyncClient:
+    # follow_redirects=False: Redirects werden von net.safe_get manuell
+    # verfolgt, damit jedes Ziel die SSRF-/Egress-Prüfkette durchläuft.
     return httpx.AsyncClient(
         timeout=REQUEST_TIMEOUT,
         headers={"User-Agent": USER_AGENT},
-        follow_redirects=True,
+        follow_redirects=False,
     )
 
 
@@ -122,15 +126,16 @@ async def fetch_zhlex_metadata(sr_number: str) -> dict:
     url = build_zhlex_search_url(sr_number)
 
     # Geteilten Client wiederverwenden (nicht schliessen — Lifespan-scoped).
+    # net.safe_get erzwingt HTTPS + Egress-Allow-List + SSRF-IP-Block + DNS-Pinning.
     client = get_client()
     try:
-        response = await client.get(url)
+        response, final_url = await net.safe_get(client, url)
 
         if response.status_code == 404:
             return {
                 "found": False,
                 "sr_number": sr_number,
-                "url": url,
+                "url": final_url,
                 "message": f"Gesetz {sr_number} nicht auf zh.ch gefunden.",
             }
 
@@ -139,10 +144,17 @@ async def fetch_zhlex_metadata(sr_number: str) -> dict:
 
         # Basis-Metadaten aus HTML extrahieren
         metadata = _extract_metadata_from_html(html, sr_number)
-        metadata["url"] = str(response.url)
+        metadata["url"] = final_url
         metadata["found"] = True
         return metadata
 
+    except net.EgressError as e:
+        return {
+            "found": False,
+            "sr_number": sr_number,
+            "url": url,
+            "error": f"Egress blockiert: {e}",
+        }
     except httpx.HTTPStatusError as e:
         return {
             "found": False,

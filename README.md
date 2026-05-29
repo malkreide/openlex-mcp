@@ -270,6 +270,7 @@ openlex-mcp/
 | **Personal data** | No personal data — all sources are aggregated, public legal texts |
 | **Rate limits** | Built-in per-query caps (max 50 search results, 5000 chars content preview) |
 | **Timeout** | 30 seconds per HTTP call to zh.ch |
+| **Egress** | Outbound requests are HTTPS-only and restricted to an allow-list (`www.zh.ch`), with SSRF IP-blocking and DNS-pinning — see [docs/network-egress.md](docs/network-egress.md) |
 | **Authentication** | No API keys required — HuggingFace dataset is public, zh.ch is open |
 | **Licenses** | Law data: CC-BY-SA 4.0 ([rcds/swiss_legislation](https://huggingface.co/datasets/rcds/swiss_legislation)); zh.ch metadata: public |
 | **Terms of Service** | Subject to ToS of [HuggingFace](https://huggingface.co/terms-of-service) and [Canton Zurich](https://www.zh.ch/de/rechtliche-hinweise.html) |
