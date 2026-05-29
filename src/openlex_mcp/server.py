@@ -24,11 +24,12 @@ import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import NoReturn
+from typing import Literal, NoReturn
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from openlex_mcp import api_client
 from openlex_mcp.data_cache import LawCache
@@ -63,6 +64,33 @@ _cache: LawCache | None = None
 
 # Logger schreibt nach stderr (stdout ist dem JSON-RPC-Stream vorbehalten, OBS-004)
 logger = logging.getLogger("openlex_mcp")
+
+
+# ---------------------------------------------------------------------------
+# Settings (ARCH-004 / SCALE-001)
+# ---------------------------------------------------------------------------
+
+
+class Settings(BaseSettings):
+    """Runtime configuration loaded from environment variables (ARCH-004).
+
+    All fields map 1-to-1 to an environment variable of the same name (upper-
+    cased by pydantic-settings). CLI flags (--host / --port / --http) are still
+    accepted for backward compatibility and override Settings values.
+    """
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    mcp_host: str = "127.0.0.1"
+    mcp_port: int = Field(default=8000, ge=1, le=65535)
+    # SCALE-001: select transport via env var; "streamable-http" triggers HTTP mode.
+    mcp_transport: Literal["stdio", "streamable-http"] = "stdio"
+    mcp_cors_origins: str = ""
+    log_level: str = "INFO"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.mcp_cors_origins.split(",") if o.strip()]
 
 
 def _fail(exc: Exception, context: str) -> NoReturn:
@@ -916,13 +944,13 @@ def _warn_on_public_binding(host: str) -> None:
 def _resolve_http_host_port() -> tuple[str, int]:
     """Ermittelt Host/Port für den HTTP-Transport.
 
-    Reihenfolge: CLI-Argument (--host/--port) > Environment
-    (MCP_HOST/MCP_PORT) > sicherer Default (127.0.0.1:8000).
+    Reihenfolge: CLI-Argument (--host/--port) > Settings (MCP_HOST/MCP_PORT
+    env vars) > sicherer Default (127.0.0.1:8000).
     0.0.0.0 wird niemals als Code-Default gesetzt — Container müssen
     MCP_HOST=0.0.0.0 explizit setzen (siehe README / Dockerfile).
     """
-    host = os.environ.get("MCP_HOST", "127.0.0.1")
-    port = int(os.environ.get("MCP_PORT", "8000"))
+    s = Settings()
+    host, port = s.mcp_host, s.mcp_port
     for i, arg in enumerate(sys.argv):
         if arg == "--host" and i + 1 < len(sys.argv):
             host = sys.argv[i + 1]
@@ -942,11 +970,7 @@ def _build_http_app():
     from starlette.middleware.cors import CORSMiddleware
 
     app = mcp.streamable_http_app()
-    origins = [
-        o.strip()
-        for o in os.environ.get("MCP_CORS_ORIGINS", "").split(",")
-        if o.strip()
-    ]
+    origins = Settings().cors_origins_list
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
@@ -964,15 +988,23 @@ def _build_http_app():
 
 
 def main():
-    """Startet den MCP-Server mit Dual-Transport (stdio oder streamable-http)."""
+    """Startet den MCP-Server mit Dual-Transport (stdio oder streamable-http).
+
+    Transport-Auswahl (SCALE-001):
+      1. MCP_TRANSPORT=streamable-http env var  → HTTP
+      2. --http CLI flag                        → HTTP (backward compat.)
+      3. Default                                → stdio
+    """
+    settings = Settings()
     # Logging explizit nach stderr — stdout ist dem JSON-RPC-Stream
     # vorbehalten (OBS-004). level via LOG_LEVEL überschreibbar.
     logging.basicConfig(
         stream=sys.stderr,
-        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        level=settings.log_level.upper(),
         format="%(asctime)s %(name)s %(levelname)s: %(message)s",
     )
-    if "--http" in sys.argv:
+    use_http = settings.mcp_transport == "streamable-http" or "--http" in sys.argv
+    if use_http:
         import uvicorn
 
         host, port = _resolve_http_host_port()
