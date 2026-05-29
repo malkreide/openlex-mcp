@@ -48,6 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **OPS-001**: test suite under `tests/` (44 unit tests) covering the law
   parser, SQLite/FTS5 cache, zh.ch client (respx-mocked), tool handlers, input
   validation, and the SEC-016 binding logic. Removed an unused `StrEnum` import.
+- **SEC-007 / SCALE-004**: multi-stage `Dockerfile` for the Render cloud
+  deployment. Builder stage installs deps; slim `python:3.11-slim` runtime stage
+  runs as non-root `appuser` (uid/gid 10001). `MCP_HOST=0.0.0.0` is set in the
+  image (Render sets `RENDER`, suppressing the NeighborJack warning). A
+  `HEALTHCHECK` polls `http://localhost:8000/health` every 30 s. A
+  `.dockerignore` excludes tests, audits, editor artefacts, and SQLite data
+  files (the DB is built at runtime from HuggingFace).
 
 ## [0.1.0] - 2026-04-12
 
