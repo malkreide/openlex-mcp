@@ -21,6 +21,9 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import NoReturn
 
 from mcp.server.fastmcp import FastMCP
@@ -80,6 +83,36 @@ def _get_cache() -> LawCache:
 
 
 # ---------------------------------------------------------------------------
+# Lifespan (SDK-001)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class AppContext:
+    """Lifespan-Kontext für geteilte, server-weite Ressourcen."""
+
+    started: bool = True
+
+
+@asynccontextmanager
+async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
+    """Verwaltet server-weite Ressourcen über den gesamten Lifecycle.
+
+    SDK-001: erstellt beim Start einen einzigen, geteilten httpx-Client
+    (kein neuer Client pro Tool-Call) und schliesst ihn beim Shutdown im
+    `finally`-Block. Bei einem Multi-Server-Setup würde hier ein
+    `AsyncExitStack` mehrere Ressourcen gemeinsam verwalten.
+    """
+    api_client.get_client()
+    logger.info("Lifespan gestartet — geteilter HTTP-Client bereit")
+    try:
+        yield AppContext()
+    finally:
+        await api_client.aclose_client()
+        logger.info("Lifespan beendet — HTTP-Client geschlossen")
+
+
+# ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
 
@@ -94,6 +127,7 @@ mcp = FastMCP(
         "Ideal in Kombination mit swiss-courts-mcp (Rechtsprechung) und "
         "zurich-opendata-mcp (Stadtratsbeschlüsse)."
     ),
+    lifespan=app_lifespan,
 )
 
 
@@ -893,6 +927,38 @@ def _resolve_http_host_port() -> tuple[str, int]:
     return host, port
 
 
+def _build_http_app():
+    """Baut die Streamable-HTTP-App inklusive CORS (SDK-004).
+
+    `Mcp-Session-Id` wird via `expose_headers` (Browser darf den Header lesen)
+    und `allow_headers` (Browser darf ihn bei Folge-Requests senden) freigegeben.
+    `allow_origins` ist **kein** Wildcard — Origins werden explizit über die
+    Env-Var `MCP_CORS_ORIGINS` (kommagetrennt) gesetzt; Default ist leer.
+    """
+    from starlette.middleware.cors import CORSMiddleware
+
+    app = mcp.streamable_http_app()
+    origins = [
+        o.strip()
+        for o in os.environ.get("MCP_CORS_ORIGINS", "").split(",")
+        if o.strip()
+    ]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "Mcp-Session-Id",
+            "Last-Event-ID",
+            "MCP-Protocol-Version",
+        ],
+        expose_headers=["Mcp-Session-Id"],
+    )
+    return app
+
+
 def main():
     """Startet den MCP-Server mit Dual-Transport (stdio oder streamable-http)."""
     # Logging explizit nach stderr — stdout ist dem JSON-RPC-Stream
@@ -903,9 +969,11 @@ def main():
         format="%(asctime)s %(name)s %(levelname)s: %(message)s",
     )
     if "--http" in sys.argv:
+        import uvicorn
+
         host, port = _resolve_http_host_port()
         _warn_on_public_binding(host)
-        mcp.run(transport="streamable-http", host=host, port=port)
+        uvicorn.run(_build_http_app(), host=host, port=port)
     else:
         mcp.run()
 

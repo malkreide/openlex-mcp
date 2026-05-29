@@ -143,7 +143,10 @@ For use via **claude.ai in the browser** (e.g. on managed workstations without l
 4. Set environment variable `MCP_HOST=0.0.0.0` so the container is reachable
    (the code default is `127.0.0.1`; Render sets the `RENDER` env var, so no
    NeighborJack warning is logged)
-5. In claude.ai under Settings → MCP Servers, add: `https://your-app.onrender.com/sse`
+5. Set `MCP_CORS_ORIGINS=https://claude.ai` so the browser can read the
+   `Mcp-Session-Id` header (comma-separated list; **no wildcard** — defaults to
+   empty, i.e. no cross-origin access)
+6. In claude.ai under Settings → MCP Servers, add: `https://your-app.onrender.com/sse`
 
 > 💡 *"stdio for the developer laptop, SSE for the browser."*
 

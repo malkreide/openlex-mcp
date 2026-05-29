@@ -80,3 +80,41 @@ async def test_fetch_zhlex_metadata_404_returns_not_found():
     meta = await api_client.fetch_zhlex_metadata("000.0")
     assert meta["found"] is False
     assert meta["sr_number"] == "000.0"
+
+
+# ---------------------------------------------------------------------------
+# SDK-001: shared HTTP client (no client-per-call)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_client_returns_shared_instance():
+    c1 = api_client.get_client()
+    c2 = api_client.get_client()
+    assert c1 is c2
+    await api_client.aclose_client()
+
+
+@pytest.mark.asyncio
+async def test_aclose_client_resets_and_recreates():
+    c1 = api_client.get_client()
+    await api_client.aclose_client()
+    assert api_client._client is None
+    c2 = api_client.get_client()
+    assert c2 is not c1
+    await api_client.aclose_client()
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_fetch_reuses_shared_client_without_closing():
+    url = api_client.build_zhlex_search_url("412.100")
+    respx.get(url).mock(
+        return_value=httpx.Response(200, html="<title>Volksschulgesetz</title>")
+    )
+    before = api_client.get_client()
+    await api_client.fetch_zhlex_metadata("412.100")
+    # Same client object survives the call (not closed per request).
+    assert api_client._client is before
+    assert api_client._client.is_closed is False
+    await api_client.aclose_client()

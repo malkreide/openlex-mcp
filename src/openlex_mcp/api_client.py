@@ -71,12 +71,37 @@ def build_lexfind_url(sr_number: str) -> str:
 
 
 async def _get_client() -> httpx.AsyncClient:
-    """Erstellt einen konfigurierten httpx-Client."""
+    """Deprecated-Alias: gibt den geteilten Client zurück (siehe get_client)."""
+    return get_client()
+
+
+# Prozessweiter, geteilter HTTP-Client — SDK-001: kein neuer Client pro
+# Tool-Call. Erstellt beim ersten Gebrauch, geschlossen im Lifespan-Shutdown.
+_client: httpx.AsyncClient | None = None
+
+
+def _build_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
         timeout=REQUEST_TIMEOUT,
         headers={"User-Agent": USER_AGENT},
         follow_redirects=True,
     )
+
+
+def get_client() -> httpx.AsyncClient:
+    """Gibt den geteilten httpx-Client zurück (lazy erstellt / wiederverwendet)."""
+    global _client
+    if _client is None or _client.is_closed:
+        _client = _build_client()
+    return _client
+
+
+async def aclose_client() -> None:
+    """Schliesst den geteilten Client (aufgerufen im Lifespan-Shutdown)."""
+    global _client
+    if _client is not None and not _client.is_closed:
+        await _client.aclose()
+    _client = None
 
 
 async def fetch_zhlex_metadata(sr_number: str) -> dict:
@@ -96,48 +121,49 @@ async def fetch_zhlex_metadata(sr_number: str) -> dict:
     """
     url = build_zhlex_search_url(sr_number)
 
-    async with await _get_client() as client:
-        try:
-            response = await client.get(url)
+    # Geteilten Client wiederverwenden (nicht schliessen — Lifespan-scoped).
+    client = get_client()
+    try:
+        response = await client.get(url)
 
-            if response.status_code == 404:
-                return {
-                    "found": False,
-                    "sr_number": sr_number,
-                    "url": url,
-                    "message": f"Gesetz {sr_number} nicht auf zh.ch gefunden.",
-                }
-
-            response.raise_for_status()
-            html = response.text
-
-            # Basis-Metadaten aus HTML extrahieren
-            metadata = _extract_metadata_from_html(html, sr_number)
-            metadata["url"] = str(response.url)
-            metadata["found"] = True
-            return metadata
-
-        except httpx.HTTPStatusError as e:
+        if response.status_code == 404:
             return {
                 "found": False,
                 "sr_number": sr_number,
                 "url": url,
-                "error": f"HTTP {e.response.status_code}",
+                "message": f"Gesetz {sr_number} nicht auf zh.ch gefunden.",
             }
-        except httpx.TimeoutException:
-            return {
-                "found": False,
-                "sr_number": sr_number,
-                "url": url,
-                "error": "Timeout bei zh.ch",
-            }
-        except Exception as e:
-            return {
-                "found": False,
-                "sr_number": sr_number,
-                "url": url,
-                "error": str(e),
-            }
+
+        response.raise_for_status()
+        html = response.text
+
+        # Basis-Metadaten aus HTML extrahieren
+        metadata = _extract_metadata_from_html(html, sr_number)
+        metadata["url"] = str(response.url)
+        metadata["found"] = True
+        return metadata
+
+    except httpx.HTTPStatusError as e:
+        return {
+            "found": False,
+            "sr_number": sr_number,
+            "url": url,
+            "error": f"HTTP {e.response.status_code}",
+        }
+    except httpx.TimeoutException:
+        return {
+            "found": False,
+            "sr_number": sr_number,
+            "url": url,
+            "error": "Timeout bei zh.ch",
+        }
+    except Exception as e:
+        return {
+            "found": False,
+            "sr_number": sr_number,
+            "url": url,
+            "error": str(e),
+        }
 
 
 def _extract_metadata_from_html(html: str, sr_number: str) -> dict:
