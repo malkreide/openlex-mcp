@@ -77,9 +77,46 @@ def test_search_input_rejects_out_of_range_limit():
         srv.SearchLawsInput(query="x", limit=999)
 
 
+def test_search_input_rejects_limit_below_min():
+    with pytest.raises(Exception):
+        srv.SearchLawsInput(query="x", limit=0)
+
+
+def test_search_input_rejects_over_length_query():
+    with pytest.raises(Exception):
+        srv.SearchLawsInput(query="x" * 501)
+
+
+def test_search_input_rejects_over_length_sr_prefix():
+    with pytest.raises(Exception):
+        srv.SearchLawsInput(query="test", sr_prefix="1" * 21)
+
+
+def test_list_laws_rejects_negative_offset():
+    with pytest.raises(Exception):
+        srv.ListLawsInput(offset=-1)
+
+
+def test_get_law_rejects_over_length_identifier():
+    with pytest.raises(Exception):
+        srv.GetLawInput(identifier="x" * 51)
+
+
 def test_metadata_input_rejects_bad_sr_number():
     with pytest.raises(Exception):
         srv.GetLawMetadataInput(sr_number="not-a-number")
+
+
+def test_search_input_strict_rejects_string_for_int_limit():
+    # SEC-018: strict=True prevents coercion of "20" (str) → 20 (int).
+    with pytest.raises(Exception):
+        srv.SearchLawsInput(query="test", limit="20")  # type: ignore[arg-type]
+
+
+def test_search_input_strict_rejects_int_for_bool():
+    # SEC-018: strict=True prevents coercion of 1 (int) → True (bool).
+    with pytest.raises(Exception):
+        srv.SearchLawsInput(query="test", active_only=1)  # type: ignore[arg-type]
 
 
 def test_protocol_error_missing_required_arg_rejected():
@@ -132,6 +169,30 @@ async def test_not_found_is_a_normal_result_not_an_error(server_with_cache):
     # guidance, NOT an isError — so it must not raise.
     out = await srv.zhlaw_get_law(srv.GetLawInput(identifier="DOESNOTEXIST"))
     assert "nicht gefunden" in out
+
+
+# ---------------------------------------------------------------------------
+# ARCH-012: protocol version pinned
+# ---------------------------------------------------------------------------
+
+
+def test_mcp_protocol_version_constant_present():
+    assert hasattr(srv, "MCP_PROTOCOL_VERSION")
+    # Sanity-check: must look like a date-format version string.
+    assert len(srv.MCP_PROTOCOL_VERSION) == 10
+    assert srv.MCP_PROTOCOL_VERSION.count("-") == 2
+
+
+# ---------------------------------------------------------------------------
+# SEC-022: tool namespace prefix
+# ---------------------------------------------------------------------------
+
+
+def test_tool_names_carry_openlex_namespace_prefix():
+    # All registered tool names must start with 'openlex__'.
+    tools = srv.mcp._tool_manager._tools
+    for name in tools:
+        assert name.startswith("openlex__"), f"Tool '{name}' missing 'openlex__' prefix"
 
 
 # ---------------------------------------------------------------------------

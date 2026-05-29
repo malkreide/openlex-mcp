@@ -72,6 +72,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Architecture section: in-process session state means single-instance only;
   horizontal scaling requires a shared session store or sticky-session LB routing
   on `Mcp-Session-Id`.
+- **SEC-022**: All 8 tool names now carry the `openlex__` server-identity prefix
+  (`openlex__zhlaw_search_laws`, …). `docs/tool-hashes.json` introduced as a
+  release-time SHA-256 snapshot of each tool's name + description + parameter
+  schema; `scripts/gen_tool_hashes.py` regenerates it. Tool-definition changes
+  must now be noted in the CHANGELOG.
+- **SEC-018**: `strict=True` added to all 8 Pydantic input model configs —
+  prevents type coercion (e.g. `"20"` → `20`, `1` → `True`) at the tool
+  boundary. New edge-case tests cover over-length strings, out-of-range numeric
+  bounds, and strict-mode coercion rejection.
+- **ARCH-012**: `MCP_PROTOCOL_VERSION = "2025-11-25"` constant added to
+  `server.py`; README "MCP Protocol Version" section documents the supported
+  version, SDK pin, and update policy. `.github/dependabot.yml` enables weekly
+  Dependabot PRs for pip and GitHub Actions dependencies.
 
 ## [0.1.0] - 2026-04-12
 

@@ -46,6 +46,10 @@ from openlex_mcp.law_parser import (
 MAX_RESULTS_DEFAULT = 20
 MAX_RESULTS_LIMIT = 50
 
+# MCP protocol version this server is built and tested against (ARCH-012).
+# Update when the SDK is upgraded to a new protocol version.
+MCP_PROTOCOL_VERSION = "2025-11-25"
+
 SOURCE_FOOTER = (
     "\n---\n*Quelle: Kanton Zürich Rechtssammlung — "
     "HuggingFace rcds/swiss_legislation (CC-BY-SA 4.0) & zh.ch*"
@@ -138,7 +142,7 @@ mcp = FastMCP(
 
 class SearchLawsInput(BaseModel):
     """Volltextsuche in allen Zürcher Gesetzen."""
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     query: str = Field(
         ...,
         description=(
@@ -172,7 +176,7 @@ class SearchLawsInput(BaseModel):
 
 class GetLawInput(BaseModel):
     """Gesetz nach Ordnungsnummer oder Abkürzung abrufen."""
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     identifier: str = Field(
         ...,
         description=(
@@ -192,7 +196,7 @@ class GetLawInput(BaseModel):
 
 class GetArticleInput(BaseModel):
     """Einzelnen Artikel aus einem Gesetz extrahieren."""
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     law_identifier: str = Field(
         ...,
         description=(
@@ -215,7 +219,7 @@ class GetArticleInput(BaseModel):
 
 class ListLawsInput(BaseModel):
     """Gesetze auflisten mit optionalem Filter."""
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     active_only: bool = Field(
         default=True,
         description="Nur aktuell gültige Gesetze.",
@@ -243,7 +247,7 @@ class ListLawsInput(BaseModel):
 
 class FindEducationLawsInput(BaseModel):
     """Bildungsrecht-Schnellsuche (LS 412.x Serie)."""
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     query: str = Field(
         ...,
         description=(
@@ -259,7 +263,7 @@ class FindEducationLawsInput(BaseModel):
 
 class SearchArticlesInput(BaseModel):
     """Suche innerhalb der Artikel eines bestimmten Gesetzes."""
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     law_identifier: str = Field(
         ...,
         description="Ordnungsnummer oder Abkürzung des Gesetzes.",
@@ -279,7 +283,7 @@ class SearchArticlesInput(BaseModel):
 
 class GetLawMetadataInput(BaseModel):
     """Aktuelle Metadaten von zh.ch abrufen."""
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     sr_number: str = Field(
         ...,
         description="Ordnungsnummer, z.B. '412.100' (Volksschulgesetz).",
@@ -291,7 +295,7 @@ class GetLawMetadataInput(BaseModel):
 
 class UpdateCacheInput(BaseModel):
     """Cache aktualisieren."""
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     force: bool = Field(
         default=False,
         description="Cache auch wenn aktuell (<24h) erzwingen.",
@@ -379,7 +383,7 @@ def _format_law_detail(law: dict, include_content: bool = False) -> str:
         if content:
             # Erste 5000 Zeichen (mit Hinweis wenn gekürzt)
             if len(content) > 5000:
-                content = content[:5000] + "\n\n*[... Text gekürzt — verwende zhlaw_get_article für einzelne Artikel]*"
+                content = content[:5000] + "\n\n*[... Text gekürzt — verwende openlex__zhlaw_get_article für einzelne Artikel]*"
             lines.extend(["", "### Volltext", "", content])
 
     return "\n".join(lines)
@@ -398,7 +402,7 @@ def _result_header(count: int, total: int, desc: str) -> str:
 
 
 @mcp.tool(
-    name="zhlaw_search_laws",
+    name="openlex__zhlaw_search_laws",
     annotations={
         "title": "Zürcher Gesetze durchsuchen",
         "readOnlyHint": True,
@@ -456,7 +460,7 @@ async def zhlaw_search_laws(params: SearchLawsInput) -> str:
 
 
 @mcp.tool(
-    name="zhlaw_get_law",
+    name="openlex__zhlaw_get_law",
     annotations={
         "title": "Zürcher Gesetz abrufen",
         "readOnlyHint": True,
@@ -483,7 +487,7 @@ async def zhlaw_get_law(params: GetLawInput) -> str:
                 f"Tipps:\n"
                 f"- Ordnungsnummer prüfen (z.B. '412.100' statt '412100')\n"
                 f"- Abkürzung versuchen (z.B. 'VSG')\n"
-                f"- Mit zhlaw_search_laws nach dem Gesetz suchen"
+                f"- Mit openlex__zhlaw_search_laws nach dem Gesetz suchen"
             ) + SOURCE_FOOTER
 
         return _format_law_detail(law, include_content=params.include_content) + SOURCE_FOOTER
@@ -498,7 +502,7 @@ async def zhlaw_get_law(params: GetLawInput) -> str:
 
 
 @mcp.tool(
-    name="zhlaw_get_article",
+    name="openlex__zhlaw_get_article",
     annotations={
         "title": "Gesetzesartikel extrahieren",
         "readOnlyHint": True,
@@ -540,7 +544,7 @@ async def zhlaw_get_article(params: GetArticleInput) -> str:
                 f"**{law['title']}** ({law.get('abbreviation', '')})\n\n"
                 f"Tipps:\n"
                 f"- Artikelnummer prüfen (nur Nummer, ohne 'Art.')\n"
-                f"- Mit zhlaw_search_articles im Gesetz suchen"
+                f"- Mit openlex__zhlaw_search_articles im Gesetz suchen"
             ) + SOURCE_FOOTER
 
         law_name = law.get("abbreviation") or law.get("sr_number", "")
@@ -564,7 +568,7 @@ async def zhlaw_get_article(params: GetArticleInput) -> str:
 
 
 @mcp.tool(
-    name="zhlaw_list_laws",
+    name="openlex__zhlaw_list_laws",
     annotations={
         "title": "Zürcher Gesetze auflisten",
         "readOnlyHint": True,
@@ -630,7 +634,7 @@ async def zhlaw_list_laws(params: ListLawsInput) -> str:
 
 
 @mcp.tool(
-    name="zhlaw_find_education_laws",
+    name="openlex__zhlaw_find_education_laws",
     annotations={
         "title": "Bildungsrecht suchen (LS 412.x)",
         "readOnlyHint": True,
@@ -676,7 +680,7 @@ async def zhlaw_find_education_laws(params: FindEducationLawsInput) -> str:
                 f"Keine Gesetze gefunden für: **{params.query}**\n\n"
                 f"Tipps:\n"
                 f"- Synonyme versuchen (z.B. 'Tagesstruktur' statt 'Tagesschule')\n"
-                f"- zhlaw_search_laws für alle Rechtsgebiete nutzen"
+                f"- openlex__zhlaw_search_laws für alle Rechtsgebiete nutzen"
             ) + SOURCE_FOOTER
 
         parts = [_result_header(
@@ -699,7 +703,7 @@ async def zhlaw_find_education_laws(params: FindEducationLawsInput) -> str:
 
 
 @mcp.tool(
-    name="zhlaw_search_articles",
+    name="openlex__zhlaw_search_articles",
     annotations={
         "title": "In Gesetzesartikeln suchen",
         "readOnlyHint": True,
@@ -758,7 +762,7 @@ async def zhlaw_search_articles(params: SearchArticlesInput) -> str:
 
 
 @mcp.tool(
-    name="zhlaw_get_law_metadata",
+    name="openlex__zhlaw_get_law_metadata",
     annotations={
         "title": "Aktuelle Metadaten von zh.ch",
         "readOnlyHint": True,
@@ -834,7 +838,7 @@ async def zhlaw_get_law_metadata(params: GetLawMetadataInput) -> str:
 
 
 @mcp.tool(
-    name="zhlaw_update_cache",
+    name="openlex__zhlaw_update_cache",
     annotations={
         "title": "Gesetzes-Cache aktualisieren",
         "readOnlyHint": False,
