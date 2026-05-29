@@ -85,6 +85,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `server.py`; README "MCP Protocol Version" section documents the supported
   version, SDK pin, and update policy. `.github/dependabot.yml` enables weekly
   Dependabot PRs for pip and GitHub Actions dependencies.
+- **ARCH-004 / SCALE-001**: `Settings` class (`pydantic-settings`) replaces
+  scattered `os.environ.get` calls in `server.py`. All runtime config is now in
+  one place: `MCP_HOST`, `MCP_PORT`, `MCP_TRANSPORT`, `MCP_CORS_ORIGINS`,
+  `LOG_LEVEL`. `MCP_TRANSPORT=streamable-http` selects HTTP mode without the
+  `--http` CLI flag (which still works for backward compatibility). Dockerfile
+  now sets `MCP_TRANSPORT=streamable-http` via `ENV`; CMD no longer passes
+  `--http`. `pydantic-settings>=2.0.0` added as a runtime dependency.
+- **SCALE-006**: `compose.yml` added with explicit memory (512 m limit / 256 m
+  reservation), CPU (0.5 vCPU limit), and FD (`nofile` 1024/2048) resource
+  limits for local testing. Mirrors the recommended Render Starter plan. Restart
+  policy `unless-stopped` and a named volume for the SQLite cache included.
 
 ## [0.1.0] - 2026-04-12
 

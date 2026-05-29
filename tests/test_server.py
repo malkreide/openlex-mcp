@@ -172,6 +172,42 @@ async def test_not_found_is_a_normal_result_not_an_error(server_with_cache):
 
 
 # ---------------------------------------------------------------------------
+# ARCH-004 / SCALE-001: Settings and MCP_TRANSPORT
+# ---------------------------------------------------------------------------
+
+
+def test_settings_defaults(monkeypatch):
+    monkeypatch.delenv("MCP_HOST", raising=False)
+    monkeypatch.delenv("MCP_PORT", raising=False)
+    monkeypatch.delenv("MCP_TRANSPORT", raising=False)
+    monkeypatch.delenv("MCP_CORS_ORIGINS", raising=False)
+    s = srv.Settings()
+    assert s.mcp_host == "127.0.0.1"
+    assert s.mcp_port == 8000
+    assert s.mcp_transport == "stdio"
+    assert s.cors_origins_list == []
+
+
+def test_settings_reads_env_vars(monkeypatch):
+    monkeypatch.setenv("MCP_HOST", "0.0.0.0")
+    monkeypatch.setenv("MCP_PORT", "9000")
+    monkeypatch.setenv("MCP_TRANSPORT", "streamable-http")
+    monkeypatch.setenv("MCP_CORS_ORIGINS", "https://claude.ai,https://example.ch")
+    s = srv.Settings()
+    assert s.mcp_host == "0.0.0.0"
+    assert s.mcp_port == 9000
+    assert s.mcp_transport == "streamable-http"
+    assert "https://claude.ai" in s.cors_origins_list
+    assert "https://example.ch" in s.cors_origins_list
+
+
+def test_settings_rejects_invalid_transport(monkeypatch):
+    monkeypatch.setenv("MCP_TRANSPORT", "websocket")
+    with pytest.raises(Exception):
+        srv.Settings()
+
+
+# ---------------------------------------------------------------------------
 # ARCH-012: protocol version pinned
 # ---------------------------------------------------------------------------
 

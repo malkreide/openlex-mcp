@@ -40,7 +40,9 @@ ENV PYTHONPATH=/app/src \
     # Bind to all interfaces so the container is reachable; the code-layer
     # NeighborJack warning is suppressed when RENDER or CONTAINER=1 is set.
     MCP_HOST=0.0.0.0 \
-    MCP_PORT=8000
+    MCP_PORT=8000 \
+    # SCALE-001: select transport via env var instead of --http CLI flag.
+    MCP_TRANSPORT=streamable-http
 
 # Drop to non-root before any network activity.
 USER appuser
@@ -54,4 +56,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     || exit 1
 
 ENTRYPOINT ["python", "-m", "openlex_mcp.server"]
-CMD ["--http", "--port", "8000"]
+# Transport, host, and port are set via ENV above — no CLI flags needed.
+# Override with e.g. docker run --env MCP_TRANSPORT=stdio for stdio mode.

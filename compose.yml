@@ -1,0 +1,47 @@
+# Local testing with resource limits (SCALE-006).
+# Mirrors recommended Render "Starter" plan constraints (512 MB RAM, 0.5 vCPU).
+#
+# Usage:
+#   docker compose up --build
+#
+# The SQLite cache (~38 MB) is built on first start; it persists in the
+# 'lawdata' named volume across restarts.
+services:
+  openlex-mcp:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8000"
+      MCP_TRANSPORT: "streamable-http"
+      MCP_CORS_ORIGINS: ""
+      LOG_LEVEL: "INFO"
+    volumes:
+      - lawdata:/app/data
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+        reservations:
+          memory: 256m
+    restart: unless-stopped
+    # File-descriptor limit (ulimits apply only to non-Swarm compose).
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 2048
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+volumes:
+  lawdata:
