@@ -1,0 +1,14 @@
+{
+  "mcp_protocol_version": "2025-11-25",
+  "tool_count": 8,
+  "tools": {
+    "openlex__zhlaw_find_education_laws": "f9a4a2993758dcb36b206b62b27423ed6705bda6d0220ceb468ac602b6a513fa",
+    "openlex__zhlaw_get_article": "cc5bdc13962703c54670a47be00ac813704282fabd5fc5726530b8a7e9211915",
+    "openlex__zhlaw_get_law": "731a9491802112811c611d8e120ac0c5a12f5ca49f2292bf7a10c1f43abc99e2",
+    "openlex__zhlaw_get_law_metadata": "4b8e9c1d11ed1b0ff5f7548fe470bd988cbdd0a159e9974439df2bf0ca5d6d6f",
+    "openlex__zhlaw_list_laws": "01b403130bd7b2e22a3fce8f892d0f39debc60ec5854104764f95108b24fe682",
+    "openlex__zhlaw_search_articles": "1f57071f5b861622b90d7ad58b781e6fbd19261f64b6f18557593e95d71119cb",
+    "openlex__zhlaw_search_laws": "8b9f4074aa1c658fd1e8b98c42b0f2afcb6cdcbacbbb8128ebb6bb5583f282f0",
+    "openlex__zhlaw_update_cache": "43168405dbda63f0514cb3174f9e1e118f010cf9fbdb33be08b9ed45398f6397"
+  }
+}

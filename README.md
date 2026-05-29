@@ -164,24 +164,24 @@ For use via **claude.ai in the browser** (e.g. on managed workstations without l
 
 | Tool | Description |
 |------|-------------|
-| `zhlaw_search_laws` | Full-text search across all ~970 ZH laws (FTS5 + BM25 ranking) |
-| `zhlaw_get_law` | Retrieve a law by LS number (e.g. `412.100`) or abbreviation (e.g. `VSG`) |
-| `zhlaw_list_laws` | List and filter laws by legal area prefix |
-| `zhlaw_find_education_laws` | Specialized search in education law (LS 412.x series) |
+| `openlex__zhlaw_search_laws` | Full-text search across all ~970 ZH laws (FTS5 + BM25 ranking) |
+| `openlex__zhlaw_get_law` | Retrieve a law by LS number (e.g. `412.100`) or abbreviation (e.g. `VSG`) |
+| `openlex__zhlaw_list_laws` | List and filter laws by legal area prefix |
+| `openlex__zhlaw_find_education_laws` | Specialized search in education law (LS 412.x series) |
 
 ### Article Extraction
 
 | Tool | Description |
 |------|-------------|
-| `zhlaw_get_article` | Extract a specific article from a law (e.g. Art. 28 VSG) |
-| `zhlaw_search_articles` | Search within all articles of a specific law |
+| `openlex__zhlaw_get_article` | Extract a specific article from a law (e.g. Art. 28 VSG) |
+| `openlex__zhlaw_search_articles` | Search within all articles of a specific law |
 
 ### Metadata & Cache
 
 | Tool | Description |
 |------|-------------|
-| `zhlaw_get_law_metadata` | Get live metadata from zh.ch (PDF links, validity status) |
-| `zhlaw_update_cache` | Refresh the local data cache from HuggingFace |
+| `openlex__zhlaw_get_law_metadata` | Get live metadata from zh.ch (PDF links, validity status) |
+| `openlex__zhlaw_update_cache` | Refresh the local data cache from HuggingFace |
 
 ### Key Legal Area Prefixes (LS Numbers)
 
@@ -198,12 +198,12 @@ For use via **claude.ai in the browser** (e.g. on managed workstations without l
 
 | Query | Tool |
 |-------|------|
-| *"What is the Volksschulgesetz?"* | `zhlaw_get_law` |
-| *"Find laws about data protection"* | `zhlaw_search_laws` |
-| *"Show me Art. 55 VSG"* | `zhlaw_get_article` |
-| *"Which education laws mention Schulleitung?"* | `zhlaw_find_education_laws` |
-| *"Find all articles about Elternrat in the VSG"* | `zhlaw_search_articles` |
-| *"Is LS 412.100 still in force?"* | `zhlaw_get_law_metadata` |
+| *"What is the Volksschulgesetz?"* | `openlex__zhlaw_get_law` |
+| *"Find laws about data protection"* | `openlex__zhlaw_search_laws` |
+| *"Show me Art. 55 VSG"* | `openlex__zhlaw_get_article` |
+| *"Which education laws mention Schulleitung?"* | `openlex__zhlaw_find_education_laws` |
+| *"Find all articles about Elternrat in the VSG"* | `openlex__zhlaw_search_articles` |
+| *"Is LS 412.100 still in force?"* | `openlex__zhlaw_get_law_metadata` |
 
 ---
 
@@ -239,6 +239,22 @@ The Streamable-HTTP transport keeps session state **in-process** (FastMCP defaul
 - **No sticky-session LB needed today** — a single-replica Render deployment naturally routes all requests to one process.
 
 Before scaling beyond one instance: either add a shared session store **or** configure your edge load balancer to route on the `Mcp-Session-Id` header with a stick-table and an appropriate TTL.
+
+---
+
+## MCP Protocol Version
+
+| Item | Value |
+|------|-------|
+| **Supported protocol version** | `2025-11-25` |
+| **SDK** | `mcp[cli] >= 1.3.0` (FastMCP) |
+| **Pinned in** | `src/openlex_mcp/server.py` — `MCP_PROTOCOL_VERSION` constant |
+
+### Update policy
+
+1. When `mcp` is upgraded (via Dependabot PR), verify the protocol version in the SDK release notes.
+2. If the protocol version changes, update `MCP_PROTOCOL_VERSION` in `server.py`, regenerate `docs/tool-hashes.json` (`PYTHONPATH=src python scripts/gen_tool_hashes.py > docs/tool-hashes.json`), and note the change in `CHANGELOG.md`.
+3. Run `pytest tests/ -m "not live"` to confirm compatibility before merging.
 
 ---
 
