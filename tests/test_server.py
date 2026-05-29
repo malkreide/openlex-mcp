@@ -186,3 +186,49 @@ def test_no_warning_when_in_container(monkeypatch, caplog):
     with caplog.at_level(logging.WARNING):
         srv._warn_on_public_binding("0.0.0.0")
     assert not caplog.records
+
+
+# ---------------------------------------------------------------------------
+# SDK-001: lifespan manages the shared HTTP client
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_lifespan_creates_and_closes_shared_client():
+    import openlex_mcp.api_client as ac
+
+    assert ac._client is None
+    async with srv.app_lifespan(srv.mcp) as ctx:
+        assert isinstance(ctx, srv.AppContext)
+        assert ac._client is not None
+        assert ac._client.is_closed is False
+    # Cleanup on lifespan exit.
+    assert ac._client is None
+
+
+# ---------------------------------------------------------------------------
+# SDK-004: CORS exposes Mcp-Session-Id, no wildcard origin
+# ---------------------------------------------------------------------------
+
+
+def _cors_kwargs(app):
+    cors = [mw for mw in app.user_middleware if mw.cls.__name__ == "CORSMiddleware"]
+    assert cors, "CORSMiddleware not configured on the HTTP app"
+    return cors[0].kwargs
+
+
+def test_http_app_cors_exposes_session_header(monkeypatch):
+    monkeypatch.delenv("MCP_CORS_ORIGINS", raising=False)
+    kwargs = _cors_kwargs(srv._build_http_app())
+    assert "Mcp-Session-Id" in kwargs["expose_headers"]
+    assert "Mcp-Session-Id" in kwargs["allow_headers"]
+    # SDK-004: no wildcard origin by default.
+    assert kwargs["allow_origins"] == []
+
+
+def test_http_app_cors_origins_from_env(monkeypatch):
+    monkeypatch.setenv("MCP_CORS_ORIGINS", "https://claude.ai, https://example.ch")
+    kwargs = _cors_kwargs(srv._build_http_app())
+    assert "https://claude.ai" in kwargs["allow_origins"]
+    assert "https://example.ch" in kwargs["allow_origins"]
+    assert "*" not in kwargs["allow_origins"]

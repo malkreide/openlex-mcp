@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **SDK-001**: a FastMCP `lifespan` (`@asynccontextmanager`) now manages a
+  single, process-wide shared `httpx.AsyncClient` instead of constructing a new
+  client on every `zhlaw_get_law_metadata` call; the client is closed on
+  lifespan shutdown.
+- **SDK-004**: CORS middleware on the Streamable-HTTP app exposes/allows the
+  `Mcp-Session-Id` header for browser clients. Origins are configured explicitly
+  via `MCP_CORS_ORIGINS` (comma-separated) — **no wildcard default**. The HTTP
+  transport is now served via `uvicorn` over the CORS-wrapped app.
+
 ### Changed
 - **OBS-001 / OBS-002**: tool execution errors are now surfaced as masked
   `isError` results (via `ToolError`) instead of being returned as plain text.

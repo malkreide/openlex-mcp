@@ -85,6 +85,16 @@ def populate(cache: LawCache, laws: list[dict] | None = None) -> None:
         conn.close()
 
 
+@pytest.fixture(autouse=True)
+def _reset_shared_http_client():
+    """Setzt den prozessweiten httpx-Client zwischen Tests zurück (SDK-001)."""
+    import openlex_mcp.api_client as ac
+
+    ac._client = None
+    yield
+    ac._client = None
+
+
 @pytest.fixture
 def cache(tmp_path) -> LawCache:
     """Ein befüllter LawCache in einem temporären Verzeichnis."""
