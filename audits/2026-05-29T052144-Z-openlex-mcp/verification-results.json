@@ -1,0 +1,505 @@
+{
+  "audit_meta": {
+    "server_name": "openlex-mcp",
+    "audit_date": "2026-05-29",
+    "skill_version": "0.5.0",
+    "catalog_version": "68-checks",
+    "applies_when_dsl_version": "1.0",
+    "policy": "fail-or-partial",
+    "catalog_hash": "091f446b27965044ce658a1d5f4b2cabe2b0ab5661dcc1a53b6be8f1f2e093c0"
+  },
+  "results": {
+    "SEC-016": {
+      "status": "fail",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": ["src/openlex_mcp/server.py:842 — mcp.run(transport=\"streamable-http\", host=\"0.0.0.0\", port=port)"],
+      "gaps": [
+        "0.0.0.0 is hardcoded as the only HTTP host, with no 127.0.0.1 default and no MCP_HOST env override (NeighborJack risk on dev laptops / shared networks)",
+        "No container-detection warning when binding to 0.0.0.0 outside a container",
+        "No Dockerfile/README differentiation between local (127.0.0.1) and container (0.0.0.0) binding"
+      ]
+    },
+    "ARCH-005": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "critical",
+      "evidence": [
+        "No secret literals in src/ (grep for api_key/password/secret/token assignments returned nothing)",
+        "No os.environ/getenv/dotenv usage — server needs no secrets (auth_model=none, public open data)",
+        ".gitignore present; HuggingFace dataset and zh.ch are public, no credentials handled"
+      ],
+      "gaps": ["No CI secret-scanning (gitleaks/trufflehog) as defence-in-depth — low priority since no secrets exist"]
+    },
+    "OBS-004": {
+      "status": "pass",
+      "category": "OBS",
+      "severity": "critical",
+      "evidence": [
+        "No print() statements anywhere in src/ (grep clean)",
+        "No logging.basicConfig(stream=sys.stdout) — stdout is never written to outside the JSON-RPC stream; data_cache uses logging.getLogger(__name__) only"
+      ],
+      "gaps": ["Logging stream is not explicitly pinned to sys.stderr — a future code/dependency change could leak to stdout and corrupt the stdio protocol; recommend explicit stderr config (hardening, low)"]
+    },
+    "SEC-020": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "No os.system / subprocess / shell=True / eval / exec / os.popen anywhere in src/ (grep clean)",
+        "All SQL uses parameterized queries with ? placeholders (data_cache.py:190-212, 318-331, 387, 405-408)",
+        "Text handling is pure-Python regex/string ops in law_parser.py; no shell or dynamic code execution"
+      ],
+      "gaps": []
+    },
+    "SEC-004": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "Outbound host is hardcoded to https://www.zh.ch (api_client.py:25,52) — not a user-supplied URL",
+        "sr_number is constrained by regex pattern ^\\d+[\\d.]*$ before URL construction (server.py:236)",
+        "Only HTTP GET to a fixed domain; no arbitrary-URL fetch tool exists"
+      ],
+      "gaps": [
+        "httpx client uses follow_redirects=True (api_client.py:77) with no validation of the redirect target — a redirect could be steered to an internal/metadata IP",
+        "No HTTPS-scheme enforcement on the resolved/redirected URL and no private-IP / 169.254.169.254 blocklist",
+        "No egress proxy / IP-range check after DNS resolution"
+      ]
+    },
+    "SEC-009": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "No custom session-ID generation in src/ — Mcp-Session-Id handling is delegated to the MCP Python SDK / FastMCP streamable-http session manager (which uses cryptographically secure IDs)"
+      ],
+      "gaps": [
+        "No user-binding of sessions is possible because auth_model=none (no validated OAuth sub-claim to bind to) — acceptable for public read-only data but undocumented",
+        "Session generation/binding is not asserted or tested by the server; relies entirely on SDK defaults",
+        "Catalog applicability gap: this critical check is gated only on transport, not on the presence of per-user state — residual risk here is low for a no-auth public read-only server"
+      ]
+    },
+    "SEC-019": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "Trifecta score is 1/3 — only public open data (no private data), only GET to fixed zh.ch (no send/POST/mail; grep for requests.post/smtplib/webhook clean), so the server is structurally safe",
+        "All search/read tools carry readOnlyHint:true; the single write tool (zhlaw_update_cache) only refreshes the local SQLite cache"
+      ],
+      "gaps": [
+        "No documented Lethal-Trifecta assessment in README/docs (pass criterion) — design is safe but the rationale is not captured for future maintainers"
+      ]
+    },
+    "ARCH-004": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "high",
+      "evidence": [
+        "Server logic is transport-agnostic: identical tool handlers serve both stdio and streamable-http (server.py:835-844)",
+        "Tools take Pydantic input models and do not reach into the raw request object"
+      ],
+      "gaps": [
+        "Configuration uses module-level globals (MAX_RESULTS_*, EDUCATION_SR_PREFIX) instead of a Pydantic-Settings object",
+        "Transport is selected via sys.argv ('--http') rather than an environment variable",
+        "No shared lifespan/setup hook (cache is lazily initialised via a module-global singleton)"
+      ]
+    },
+    "ARCH-006": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "high",
+      "evidence": [
+        "8 tools, each a high-level use case (search, get_law, get_article, list, find_education, search_articles, get_metadata, update_cache) — within the <=12 budget",
+        "No 1:1 REST-endpoint mapping; the anchor query ('find education-law articles on X') is answerable in 1-2 calls"
+      ],
+      "gaps": []
+    },
+    "ARCH-009": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "high",
+      "evidence": [
+        "All 8 tools declare explicit annotations (readOnlyHint/destructiveHint/idempotentHint/openWorldHint) — server.py:350-356,408-414,...,786-792",
+        "readOnlyHint is consistent: false only on zhlaw_update_cache; openWorldHint:true on the two tools that hit the network (get_law_metadata, update_cache)"
+      ],
+      "gaps": [
+        "zhlaw_update_cache overwrites the local cache (DELETE FROM laws) but sets destructiveHint:false — debatable; and there is no consolidated annotations table in the README (low)"
+      ]
+    },
+    "OBS-001": {
+      "status": "partial",
+      "category": "OBS",
+      "severity": "high",
+      "evidence": [
+        "Every tool wraps its body in try/except and routes failures through api_client.handle_error (server.py:397, 439, 505, ...)",
+        "handle_error maps httpx status/timeout/connect errors to friendly messages (api_client.py:197-219)"
+      ],
+      "gaps": [
+        "Application errors are returned as a plain Markdown string, not via the MCP isError:true tool-result mechanism — the LLM cannot distinguish success from failure programmatically",
+        "No tests cover either execution-error or protocol-error paths (no tests/ directory at all)"
+      ]
+    },
+    "OBS-002": {
+      "status": "partial",
+      "category": "OBS",
+      "severity": "high",
+      "evidence": [
+        "Known error classes are masked to user-friendly text (api_client.py:201-217) — no tracebacks for HTTP/timeout/connect errors"
+      ],
+      "gaps": [
+        "The catch-all branch returns f\"{type(e).__name__}: {e}\" (api_client.py:219), leaking raw exception text (potentially SQLite/parse internals) to the LLM",
+        "FastMCP is not initialised with mask_error_details=True (server.py:68-79)"
+      ]
+    },
+    "OPS-001": {
+      "status": "fail",
+      "category": "OPS",
+      "severity": "high",
+      "evidence": [],
+      "gaps": [
+        "No tests/ directory exists at all, yet pyproject.toml sets testpaths=['tests'] and ci.yml runs 'pytest tests/ -m \"not live\"' — CI would currently error/collect nothing",
+        "No unit tests (respx HTTP mocking is a declared dev-dependency but unused), no live tests, no @pytest.mark.live tests despite the 'live' marker being registered"
+      ]
+    },
+    "OPS-003": {
+      "status": "partial",
+      "category": "OPS",
+      "severity": "high",
+      "evidence": [
+        "Server is de-facto Phase 1 (read-only): all query tools are read-only, matching a Phase-1 posture"
+      ],
+      "gaps": [
+        "No explicit phase declaration in the README",
+        "No roadmap file with phase-specific tasks",
+        "Phase transitions / preconditions are not documented"
+      ]
+    },
+    "SCALE-001": {
+      "status": "partial",
+      "category": "SCALE",
+      "severity": "high",
+      "evidence": [
+        "Streamable-HTTP transport is implemented for cloud (server.py:842); stdio is the local default; no WebSocket code present"
+      ],
+      "gaps": [
+        "Transport selection is via the '--http' CLI flag, not the ENV-based selection the check expects (MCP_TRANSPORT)"
+      ]
+    },
+    "SCALE-002": {
+      "status": "partial",
+      "category": "SCALE",
+      "severity": "high",
+      "evidence": [
+        "Single-instance Render deployment documented in README; FastMCP keeps streamable-http session state in-process"
+      ],
+      "gaps": [
+        "No sticky-session / shared-state (Redis, Durable Objects) mechanism — horizontal scaling would break sessions",
+        "No explicit session TTL; no failover handling/test",
+        "Acceptable only for single-instance deploy; not documented as such"
+      ]
+    },
+    "SCALE-003": {
+      "status": "partial",
+      "category": "SCALE",
+      "severity": "high",
+      "evidence": [
+        "Cloud target is a single Render web service (README) — no multi-backend LB in scope today"
+      ],
+      "gaps": [
+        "No edge-LB Mcp-Session-Id routing / stick-table configuration documented or provided",
+        "No failover behaviour defined for multi-backend scale-out"
+      ]
+    },
+    "SDK-001": {
+      "status": "partial",
+      "category": "SDK",
+      "severity": "high",
+      "evidence": [
+        "Cache is initialised once via a module-global singleton (_get_cache, server.py:55-61) rather than per-call"
+      ],
+      "gaps": [
+        "No FastMCP lifespan defined via @asynccontextmanager; no AsyncExitStack",
+        "api_client._get_client() constructs a fresh httpx.AsyncClient on every metadata call (api_client.py:72-78) instead of reusing a lifespan-scoped client"
+      ]
+    },
+    "SDK-004": {
+      "status": "partial",
+      "category": "SDK",
+      "severity": "high",
+      "evidence": [
+        "README documents browser/claude.ai access over Streamable-HTTP/SSE (README.md:124-132)"
+      ],
+      "gaps": [
+        "No CORS middleware configured in code (no CORSMiddleware/allow_origins/expose_headers)",
+        "Mcp-Session-Id is not added to expose_headers/allow_headers — browser clients may fail to read the session header; relies on FastMCP defaults",
+        "allow_origins is not pinned to an explicit non-wildcard list for production"
+      ]
+    },
+    "SEC-005": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Only a single fixed upstream host (www.zh.ch) is contacted, limiting DNS-rebinding exposure"
+      ],
+      "gaps": [
+        "No DNS pinning: httpx performs its own resolution per request and follow_redirects=True allows a second resolution/target (TOCTOU window)",
+        "No test verifying a single DNS resolution per request"
+      ]
+    },
+    "SEC-006": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Default invocation (no args) runs mcp.run() in stdio with no TCP port (server.py:843-844)",
+        "HTTP transport is strictly opt-in via the explicit '--http' flag; README documents stdio/Claude-Desktop as the primary local use case and cloud separately (README.md:78-79,124-132)"
+      ],
+      "gaps": [
+        "Opt-in is a CLI flag rather than MCP_TRANSPORT env var, and the cloud section is light on security hardening notes (minor)"
+      ]
+    },
+    "SEC-007": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Local default is stdio with no network surface; PyPI publish uses OIDC Trusted Publisher (publish.yml)"
+      ],
+      "gaps": [
+        "No Dockerfile at all — no non-root USER, no dropped capabilities, no read-only rootfs, no seccomp profile for the documented Render cloud deployment"
+      ]
+    },
+    "SEC-013": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Public Open Data profile — Stufe 1 (plain env vars) is acceptable per the check; the server holds no secrets at all"
+      ],
+      "gaps": [
+        "No docs/secret-management.md documenting the (empty) secret posture as the check requires for Public Open Data"
+      ]
+    },
+    "SEC-018": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "All 8 tools use Pydantic input models with extra=\"forbid\" and str_strip_whitespace (server.py:89,123,...)",
+        "Numeric fields have ge/le bounds (limit ge=1,le=50; offset ge=0); string fields have min_length/max_length; sr_number has a whitelist pattern ^\\d+[\\d.]*$ (server.py:236)"
+      ],
+      "gaps": [
+        "Pydantic strict=True is not set on the model configs",
+        "No tests exercise edge cases (over-length strings, out-of-range numbers, unknown fields)"
+      ]
+    },
+    "SEC-021": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Effective egress is constrained: upstream hosts are hardcoded constants (ZHLEX_BASE, LEXFIND_BASE in api_client.py:25-26) plus HuggingFace for dataset download"
+      ],
+      "gaps": [
+        "No code-layer egress allow-list (frozenset) and no assert_host_allowed pre-request check",
+        "No network-layer egress control (NetworkPolicy/Security Group) and no docs/network-egress.md",
+        "follow_redirects=True can leave the intended host without an allow-list gate"
+      ]
+    },
+    "SEC-022": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "All tools share a consistent 'zhlaw_' namespace prefix (server.py tool names)",
+        "CHANGELOG.md is present for change tracking"
+      ],
+      "gaps": [
+        "Prefix is 'zhlaw_' rather than the '<server>__<tool>' server-identity format the check specifies",
+        "No tool-definition hash snapshot is generated/stored at release time; no CHANGELOG convention for tool-definition changes / re-approval"
+      ]
+    },
+    "ARCH-001": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "Uniform snake_case 'zhlaw_*' naming across all 8 tools; no spaces/dots/special chars",
+        "Tool descriptions carry use-case context and examples (server.py docstrings)"
+      ],
+      "gaps": []
+    },
+    "ARCH-002": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "All tool docstrings are well over 100 chars with concrete examples and synergy notes (e.g. server.py:359-366, 590-599)",
+        "Similar tools are differentiated explicitly (search_laws vs find_education_laws vs search_articles)"
+      ],
+      "gaps": ["No literal <use_case> tag markup, but equivalent contextual descriptions are present (low)"]
+    },
+    "ARCH-003": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "Empty search results return actionable tips (alternative terms, FTS5 syntax, other tools) — server.py:377-384, 430-435",
+        "find_education_laws falls back to a broader search when the 412.x subset is empty (server.py:609-621)"
+      ],
+      "gaps": ["No explicit match_type field (exact/fuzzy/none) in responses (low)"]
+    },
+    "ARCH-007": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "Tools return self-contained Markdown results (formatted laws/articles), not bare IDs/pointers",
+        "Anchor query answerable in <=2 calls (search -> get_article)"
+      ],
+      "gaps": []
+    },
+    "ARCH-008": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": ["Server uses the Tools primitive exclusively (8 tools)"],
+      "gaps": [
+        "No Resources or Prompts primitives, and no README justification for tools-only",
+        "Deterministic read-only lookups (get_law, get_article) are good Resources-migration candidates"
+      ]
+    },
+    "ARCH-011": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "Top-level files present: README.md, README.de.md, CHANGELOG.md, LICENSE, pyproject.toml",
+        "Correct src-layout (src/openlex_mcp/...); .github/workflows present with ci.yml + publish.yml"
+      ],
+      "gaps": ["tests/ directory is missing entirely (required by the standard repo structure)"]
+    },
+    "ARCH-012": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": ["CHANGELOG.md present"],
+      "gaps": [
+        "protocolVersion is not explicitly pinned in server code (relies on SDK default)",
+        "No 'MCP Protocol Version' README section and no documented update policy",
+        "No Dependabot/Renovate config for SDK update PRs"
+      ]
+    },
+    "CH-004": {
+      "status": "pass",
+      "category": "CH",
+      "severity": "medium",
+      "evidence": [
+        "Every tool response appends SOURCE_FOOTER citing 'HuggingFace rcds/swiss_legislation (CC-BY-SA 4.0) & zh.ch' (server.py:43-46)",
+        "README documents all data sources with licenses (README.md:205-209,257)"
+      ],
+      "gaps": ["Attribution is global per-response rather than per-record provenance (low)"]
+    },
+    "OBS-003": {
+      "status": "partial",
+      "category": "OBS",
+      "severity": "medium",
+      "evidence": ["Uses stdlib logging.getLogger with info/warning levels (data_cache.py:23,244,336)"],
+      "gaps": [
+        "No structured logger (structlog/loguru) in dependencies; output is not JSON/logfmt",
+        "No per-tool-call bound context (tool name, session_id, correlation_id)"
+      ]
+    },
+    "OBS-006": {
+      "status": "partial",
+      "category": "OBS",
+      "severity": "medium",
+      "evidence": ["N/A in practice for a single small read-only service"],
+      "gaps": [
+        "No OpenTelemetry SDK / TracerProvider / OTLP exporter despite is_cloud_deployed (low priority for this workload)"
+      ]
+    },
+    "OPS-002": {
+      "status": "pass",
+      "category": "OPS",
+      "severity": "medium",
+      "evidence": [
+        "README.md has Installation/Tools/Security & Limits/Architecture sections with an ASCII diagram (README.md:196-209) and a Limits table (README.md:254-256)",
+        "README.de.md mirrors the top-level sections; CHANGELOG.md and CONTRIBUTING.md present"
+      ],
+      "gaps": ["Anchor-demo natural-language query could be made more prominent (low)"]
+    },
+    "SCALE-004": {
+      "status": "fail",
+      "category": "SCALE",
+      "severity": "medium",
+      "evidence": [],
+      "gaps": [
+        "No Dockerfile present at all — no multi-stage build, no slim base, no non-root USER, no HEALTHCHECK for the documented cloud (Render) deployment"
+      ]
+    },
+    "SCALE-006": {
+      "status": "partial",
+      "category": "SCALE",
+      "severity": "medium",
+      "evidence": ["MAX_RESULTS_LIMIT=50 and content-preview caps bound per-request work (server.py:40-41, 330)"],
+      "gaps": [
+        "No container memory/CPU/FD limits defined (no Dockerfile/compose/k8s manifest)",
+        "OOM/restart behaviour not defined"
+      ]
+    },
+    "SDK-002": {
+      "status": "partial",
+      "category": "SDK",
+      "severity": "medium",
+      "evidence": [
+        "Pydantic >=2.0 in dependencies; all tools have explicit '-> str' return annotations and use Field(default=...) for defaults"
+      ],
+      "gaps": [
+        "Tool returns are formatted Markdown strings, not a structured response envelope (source/provenance/results/count) or BaseModel/TypedDict",
+        "No Literal types for enumerable values"
+      ]
+    },
+    "SDK-003": {
+      "status": "partial",
+      "category": "SDK",
+      "severity": "medium",
+      "evidence": ["Cache refresh logs duration via stdlib logger (data_cache.py:244)"],
+      "gaps": [
+        "zhlaw_update_cache (HuggingFace dataset load — typically >2s) takes no ctx: Context and emits no ctx.report_progress()",
+        "No tool uses ctx.info()/ctx.warning(); errors are surfaced only as return strings"
+      ]
+    },
+    "SEC-008": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "medium",
+      "evidence": [
+        "No pre/postinstall hooks; install is standard 'pip install -e .' shown transparently in README",
+        "publish.yml uses PyPI OIDC Trusted Publisher (id-token: write) — Sigstore-backed provenance; CONTRIBUTING.md documents the build"
+      ],
+      "gaps": []
+    },
+    "SEC-014": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "medium",
+      "evidence": ["All 8 tools are read-only/non-sensitive public-data tools; no gateway needed today"],
+      "gaps": [
+        "No tool allow-listing / MCP-gateway default-deny pattern and no denied-call auditing (low priority for public read-only data)"
+      ]
+    },
+    "SEC-015": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "medium",
+      "evidence": ["No tool-poisoning surface today (static, read-only, fixed upstreams)"],
+      "gaps": [
+        "No pre-flight tool-poisoning detection layer (system-prompt/override/invisible-char/homoglyph patterns) and no tests for it (low priority for this profile)"
+      ]
+    }
+  }
+}
