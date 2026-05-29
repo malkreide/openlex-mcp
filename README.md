@@ -46,6 +46,12 @@ Built for the Schulamt (school department) of the City of Zurich, but covers all
 
 ---
 
+## Development Phase
+
+**Current phase: Phase 1 — Read-Only.** All tools are read-only (`readOnlyHint: true`); no writes to external systems. See [ROADMAP.md](ROADMAP.md) for the phase plan and transition gates before any write or multi-agent capability is added.
+
+---
+
 ## Prerequisites
 
 - Python 3.11+
@@ -225,6 +231,15 @@ For use via **claude.ai in the browser** (e.g. on managed workstations without l
 | zh.ch ZH-Lex | HTTP/HTML | Current metadata, PDFs | None | Public |
 | LexFind.ch | HTTP | Cross-cantonal links | None | Public |
 
+### Scaling Constraints
+
+The Streamable-HTTP transport keeps session state **in-process** (FastMCP default). This has two implications:
+
+- **Single-instance only** — horizontal scaling (multiple replicas) breaks active sessions because there is no shared session store (Redis, Durable Objects, etc.).
+- **No sticky-session LB needed today** — a single-replica Render deployment naturally routes all requests to one process.
+
+Before scaling beyond one instance: either add a shared session store **or** configure your edge load balancer to route on the `Mcp-Session-Id` header with a stick-table and an appropriate TTL.
+
 ---
 
 ## Project Structure
@@ -272,6 +287,9 @@ openlex-mcp/
 | **Timeout** | 30 seconds per HTTP call to zh.ch |
 | **Egress** | Outbound requests are HTTPS-only and restricted to an allow-list (`www.zh.ch`), with SSRF IP-blocking and DNS-pinning — see [docs/network-egress.md](docs/network-egress.md) |
 | **Authentication** | No API keys required — HuggingFace dataset is public, zh.ch is open |
+| **Security posture (Lethal Trifecta)** | Score **1 / 3**: public data only (no private/sensitive data) ✓ · GET-only egress to `www.zh.ch` — no POST, no webhooks, no email ✓ · no code execution ✓. Structurally safe by design. |
+| **Session handling** | `Mcp-Session-Id` generated and managed by the MCP SDK (cryptographically secure UUIDs). No user-identity binding — `auth_model=none` is correct for public read-only data. If authentication is ever added, bind sessions to the validated OAuth `sub` claim before deployment. |
+| **Secrets** | No secrets held — all data sources are public. See [docs/secret-management.md](docs/secret-management.md). |
 | **Licenses** | Law data: CC-BY-SA 4.0 ([rcds/swiss_legislation](https://huggingface.co/datasets/rcds/swiss_legislation)); zh.ch metadata: public |
 | **Terms of Service** | Subject to ToS of [HuggingFace](https://huggingface.co/terms-of-service) and [Canton Zurich](https://www.zh.ch/de/rechtliche-hinweise.html) |
 | **Disclaimer** | This server provides legal texts for informational purposes only — it does not constitute legal advice |
@@ -293,6 +311,12 @@ pytest tests/ -m "live"
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md)
+
+---
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md)
 
 ---
 
