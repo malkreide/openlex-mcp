@@ -96,6 +96,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reservation), CPU (0.5 vCPU limit), and FD (`nofile` 1024/2048) resource
   limits for local testing. Mirrors the recommended Render Starter plan. Restart
   policy `unless-stopped` and a named volume for the SQLite cache included.
+- **SDK-003**: `ctx: Context` added to `zhlaw_update_cache`; `ctx.info()` on
+  start and completion, `ctx.report_progress(0/1 → 1/1)` around the
+  HuggingFace load, and `ctx.warning()` on error-status results. Progress is
+  now surfaced to the MCP client during the ~25 s initial dataset download.
+- **ARCH-008**: Tools-only design decision documented in README Architecture
+  section — all endpoints are parametric, the 974-law corpus is too large for
+  static Resource URIs, and URI-template Resources are noted as a Phase-2
+  consideration.
+- **OBS-006 / SEC-014 / SEC-015**: Acknowledged as accepted-risk and recorded
+  in `ROADMAP.md` "Deferred / Accepted Risk" table. Each is gated on Phase 2
+  prerequisites (multi-tenant exposure, authentication, distributed tracing
+  need) and not actionable for the current single-tenant, public-data profile.
 
 ## [0.1.0] - 2026-04-12
 

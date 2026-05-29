@@ -231,6 +231,14 @@ For use via **claude.ai in the browser** (e.g. on managed workstations without l
 | zh.ch ZH-Lex | HTTP/HTML | Current metadata, PDFs | None | Public |
 | LexFind.ch | HTTP | Cross-cantonal links | None | Public |
 
+### Design Decision: Tools-only (no MCP Resources)
+
+All 8 endpoints are exposed as **Tools** rather than MCP Resources. Rationale:
+
+- Every lookup is **parametric** — queries, abbreviations, article numbers vary per call. Static Resources (one URI per document) don't capture this naturally.
+- The corpus is **974 laws × many articles** — registering each as a Resource URI would create an impractically large resource list.
+- MCP Resource templates (`zhlex://laws/{sr_number}`) are a future consideration for Phase 2 if clients benefit from resource-level caching or subscriptions.
+
 ### Scaling Constraints
 
 The Streamable-HTTP transport keeps session state **in-process** (FastMCP default). This has two implications:

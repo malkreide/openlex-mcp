@@ -26,7 +26,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Literal, NoReturn
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -875,7 +875,7 @@ async def zhlaw_get_law_metadata(params: GetLawMetadataInput) -> str:
         "openWorldHint": True,
     },
 )
-async def zhlaw_update_cache(params: UpdateCacheInput) -> str:
+async def zhlaw_update_cache(ctx: Context, params: UpdateCacheInput) -> str:
     """Aktualisiert den lokalen Cache der Zürcher Gesetzesdaten.
 
     Lädt die neuesten Daten von HuggingFace (rcds/swiss_legislation)
@@ -883,12 +883,16 @@ async def zhlaw_update_cache(params: UpdateCacheInput) -> str:
     Normalerweise nur nötig wenn Daten >24h alt sind.
     """
     try:
+        await ctx.info("Cache-Update gestartet — prüfe Aktualität…")
         cache = _get_cache()
+        await ctx.report_progress(progress=0, total=1)
         result = cache.load_from_huggingface(force=params.force)
+        await ctx.report_progress(progress=1, total=1)
 
         status = result.get("status", "unknown")
         if status == "cache_fresh":
             count = result.get("total", 0)
+            await ctx.info(f"Cache ist aktuell — {count} Gesetze im Cache.")
             return (
                 f"## Cache ist aktuell\n\n"
                 f"**Gesetze im Cache:** {count}\n"
@@ -896,14 +900,19 @@ async def zhlaw_update_cache(params: UpdateCacheInput) -> str:
                 f"Verwende `force=True` um trotzdem zu aktualisieren."
             )
         elif status == "ok":
+            loaded = result["loaded"]
+            duration = result["duration_s"]
+            await ctx.info(f"Cache-Update abgeschlossen: {loaded} Gesetze in {duration}s geladen.")
             return (
                 f"## Cache aktualisiert\n\n"
-                f"**Geladene Gesetze:** {result['loaded']}\n"
-                f"**Dauer:** {result['duration_s']}s\n"
+                f"**Geladene Gesetze:** {loaded}\n"
+                f"**Dauer:** {duration}s\n"
                 f"**Quelle:** HuggingFace rcds/swiss_legislation"
             )
         elif status == "error":
-            return f"## Fehler beim Cache-Update\n\n{result.get('message', 'Unbekannter Fehler')}"
+            msg = result.get("message", "Unbekannter Fehler")
+            await ctx.warning(f"Cache-Update fehlgeschlagen: {msg}")
+            return f"## Fehler beim Cache-Update\n\n{msg}"
         else:
             return f"## Cache-Status: {status}\n\n**Gesetze:** {result.get('total', 0)}"
 

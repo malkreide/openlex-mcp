@@ -13,17 +13,17 @@
 - Hardened outbound HTTP: HTTPS-only, egress allow-list, SSRF IP-block, DNS-pinning
 - CORS support for browser clients (`Mcp-Session-Id` exposure)
 - Lifespan-scoped shared `httpx.AsyncClient`
-- Non-root multi-stage Docker container with HEALTHCHECK
-- 75-test CI suite (Python 3.11 / 3.12 / 3.13)
+- Non-root multi-stage Docker container with HEALTHCHECK + `compose.yml` resource limits
+- `pydantic-settings` `Settings` class + `MCP_TRANSPORT` env var
+- `openlex__` tool namespace prefix + `docs/tool-hashes.json` release snapshot
+- `MCP_PROTOCOL_VERSION` pinned + Dependabot weekly PRs
+- Pydantic `strict=True` input validation + 87-test CI suite (Python 3.11 / 3.12 / 3.13)
+- `ctx.report_progress()` / `ctx.info()` / `ctx.warning()` in `zhlaw_update_cache` (SDK-003)
 
 ### Planned (Phase 1)
 
 - Structured logging — structlog with JSON/logfmt output, per-call context binding (OBS-003)
-- Pydantic v2 strict mode + structured response envelopes (SEC-018 / SDK-002)
-- Progress reporting — `ctx.report_progress()` during `zhlaw_update_cache` HuggingFace load (SDK-003)
-- Tool namespace prefix `openlex__<tool>` + release hash snapshot (SEC-022)
-- MCP `protocolVersion` pinning + Dependabot for SDK updates (ARCH-012)
-- Container CPU/memory resource limits (SCALE-006)
+- Structured response envelopes — Pydantic TypedDict instead of Markdown strings (SDK-002)
 
 ## Phase 1 → Phase 2 Transition Gates
 
@@ -35,6 +35,17 @@ Before adding write tools or external-send capabilities, **all** of the followin
 4. **Shared session store** — Redis or equivalent for multi-replica Streamable-HTTP sessions (SCALE-002/003).
 5. **Tool allow-list gateway** — default-deny list with auditing for denied calls (SEC-014).
 6. **Update secret management posture** — move any new credentials to a secret manager (SEC-013).
+
+## Deferred / Accepted Risk
+
+The following controls are acknowledged but intentionally deferred. Each will be
+revisited at the Phase 1 → 2 transition (or earlier if the deployment profile changes).
+
+| Control | Rationale for deferral |
+|---------|----------------------|
+| **OBS-006** — OpenTelemetry tracing | Single-instance, single-tenant, read-only service. Distributed tracing adds no actionable signal until the service is multi-replica or multi-tenant. Scheduled for Phase 2. |
+| **SEC-014** — Tool allow-list gateway | All 8 tools are public read-only data. Default-deny allow-listing is only needed before multi-tenant exposure. Pre-condition: authentication (Phase 2 gate). |
+| **SEC-015** — Pre-flight tool-poisoning detection | No tool-poisoning surface today (static schema, read-only, fixed upstreams). Relevant only when the server is exposed through a multi-tenant gateway with untrusted prompt inputs. Phase 2 gate. |
 
 ## Phase 2 — Write / External-Send (future)
 
