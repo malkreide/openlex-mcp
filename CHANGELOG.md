@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **SEC-016**: HTTP transport now defaults to `127.0.0.1` instead of hardcoded
+  `0.0.0.0`. Host/port are configurable via `MCP_HOST`/`MCP_PORT` env vars (or
+  `--host`/`--port`). Binding to `0.0.0.0` outside a detected container logs a
+  NeighborJack warning. Cloud deployments must set `MCP_HOST=0.0.0.0` explicitly.
+
+### Fixed
+- `User-Agent` header no longer contains a non-ASCII character (`Zürich` →
+  `Zuerich`), which made `zhlaw_get_law_metadata` raise `UnicodeEncodeError`.
+
+### Added
+- **OPS-001**: test suite under `tests/` (44 unit tests) covering the law
+  parser, SQLite/FTS5 cache, zh.ch client (respx-mocked), tool handlers, input
+  validation, and the SEC-016 binding logic. Removed an unused `StrEnum` import.
+
 ## [0.1.0] - 2026-04-12
 
 ### Added
