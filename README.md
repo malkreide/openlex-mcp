@@ -273,20 +273,44 @@ openlex-mcp/
 ├── src/openlex_mcp/
 │   ├── __init__.py              # Package
 │   ├── __main__.py              # Entry point for python -m
-│   ├── server.py                # 8 MCP tool definitions (FastMCP)
+│   ├── server.py                # 8 MCP tool definitions (FastMCP) + Settings
+│   ├── responses.py             # Typed structured response envelopes (SDK-002)
+│   ├── logging_config.py        # structlog JSON logging setup (OBS-003)
+│   ├── net.py                   # SSRF/egress-hardened outbound HTTP
 │   ├── api_client.py            # zh.ch HTTP client + metadata extraction
 │   ├── data_cache.py            # SQLite + FTS5 cache management
 │   └── law_parser.py            # Article extraction from law texts
-├── tests/
-│   └── test_server.py           # Unit + integration tests
+├── tests/                       # 89 unit tests (parser, cache, net, tools…)
+├── scripts/gen_tool_hashes.py   # Tool-definition hash snapshot (SEC-022)
+├── docs/                        # network-egress, secret-management, tool-hashes
 ├── .github/workflows/ci.yml     # GitHub Actions (Python 3.11/3.12/3.13)
+├── .github/dependabot.yml       # Weekly dependency PRs (ARCH-012)
+├── Dockerfile                   # Hardened multi-stage build (SEC-007/SCALE-004)
+├── compose.yml                  # Resource limits for local testing (SCALE-006)
 ├── pyproject.toml
 ├── claude_desktop_config.json   # Example config for Claude Desktop
 ├── CHANGELOG.md
+├── ROADMAP.md                   # Phase plan + accepted-risk register
 ├── CONTRIBUTING.md
 ├── LICENSE
 ├── README.md                    # This file (English)
 └── README.de.md                 # German version
+```
+
+### Tool output format
+
+All tools return a **structured response envelope** (not Markdown text), so MCP
+clients receive `structuredContent` they can parse directly:
+
+```jsonc
+{
+  "source": "Kanton Zürich Rechtssammlung — HuggingFace … & zh.ch",
+  "provenance": "cache",          // cache | live | parser | cache+parser | none
+  "result_type": "law_summaries", // law_summaries | law_detail | articles | metadata | cache_status
+  "count": 2,
+  "message": null,                // human-readable guidance for empty/edge results
+  "results": [ /* typed items */ ]
+}
 ```
 
 ---

@@ -26,6 +26,7 @@ def _tool_signature(tool) -> str:
             "name": tool.name,
             "description": (tool.description or "").strip(),
             "parameters": tool.parameters,
+            "output_schema": getattr(tool, "output_schema", None),
         },
         sort_keys=True,
         ensure_ascii=False,

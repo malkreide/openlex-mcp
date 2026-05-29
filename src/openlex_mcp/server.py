@@ -34,10 +34,22 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from openlex_mcp import api_client
 from openlex_mcp.data_cache import LawCache
 from openlex_mcp.law_parser import (
+    Article,
     extract_article,
-    format_article,
-    format_article_list,
     search_in_articles,
+)
+from openlex_mcp.logging_config import configure_logging, get_logger, tool_logger
+from openlex_mcp.responses import (
+    ArticleItem,
+    ArticleResponse,
+    CacheStatusItem,
+    CacheStatusResponse,
+    LawDetail,
+    LawDetailResponse,
+    LawListResponse,
+    LawSummary,
+    MetadataItem,
+    MetadataResponse,
 )
 
 # ---------------------------------------------------------------------------
@@ -51,19 +63,14 @@ MAX_RESULTS_LIMIT = 50
 # Update when the SDK is upgraded to a new protocol version.
 MCP_PROTOCOL_VERSION = "2025-11-25"
 
-SOURCE_FOOTER = (
-    "\n---\n*Quelle: Kanton Zürich Rechtssammlung — "
-    "HuggingFace rcds/swiss_legislation (CC-BY-SA 4.0) & zh.ch*"
-)
-
 # Bildungsrecht Ordnungsnummern-Prefix
 EDUCATION_SR_PREFIX = "412"
 
 # Globaler Cache (wird beim ersten Tool-Aufruf initialisiert)
 _cache: LawCache | None = None
 
-# Logger schreibt nach stderr (stdout ist dem JSON-RPC-Stream vorbehalten, OBS-004)
-logger = logging.getLogger("openlex_mcp")
+# Strukturierter Logger (structlog, JSON nach stderr — OBS-003 / OBS-004).
+logger = get_logger("openlex_mcp")
 
 
 # ---------------------------------------------------------------------------
@@ -93,15 +100,16 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.mcp_cors_origins.split(",") if o.strip()]
 
 
-def _fail(exc: Exception, context: str) -> NoReturn:
-    """Loggt den Originalfehler nach stderr und wirft einen maskierten ToolError.
+def _fail(exc: Exception, context: str, log=None) -> NoReturn:
+    """Loggt den Originalfehler strukturiert und wirft einen maskierten ToolError.
 
     Erfüllt OBS-001 (Execution-Errors werden als `isError`-Tool-Result
     zurückgegeben, nicht als JSON-RPC-Protocol-Error) und OBS-002 (keine
     Stacktraces / Internals gelangen ans LLM — nur eine handlungsweisende,
     maskierte Meldung; der Originalfehler bleibt ausschliesslich im Server-Log).
+    Der gebundene Logger (`log`) trägt Tool-Name + Correlation-ID (OBS-003).
     """
-    logger.exception("%s fehlgeschlagen", context)
+    (log or logger).exception("tool_execution_failed", context=context)
     raise ToolError(api_client.handle_error(exc, context)) from exc
 
 
@@ -352,76 +360,65 @@ def _resolve_law(identifier: str) -> dict | None:
     return None
 
 
-def _format_law_summary(law: dict, idx: int = 0) -> str:
-    """Formatiert ein Gesetz als kompakte Markdown-Zusammenfassung."""
-    prefix = f"### {idx}. " if idx > 0 else "### "
-    abbr = f" ({law['abbreviation']})" if law.get("abbreviation") else ""
-    status = "In Kraft" if law.get("is_active") else "Aufgehoben"
-
-    lines = [
-        f"{prefix}{law['title']}{abbr}",
-        f"- **Ordnungsnr.:** {law.get('sr_number', '—')}",
-        f"- **Status:** {status}",
-    ]
-    if law.get("short_desc"):
-        lines.append(f"- **Kurzbeschreibung:** {law['short_desc']}")
-    if law.get("version_since"):
-        lines.append(f"- **Version seit:** {law['version_since'][:10]}")
-
-    # Snippet wenn vorhanden (aus FTS5-Suche)
-    if law.get("snippet"):
-        lines.append(f"- **Fundstelle:** ...{law['snippet']}...")
-
-    return "\n".join(lines)
+def _to_summary(law: dict) -> LawSummary:
+    """Konvertiert ein Cache-Gesetz in ein LawSummary-Modell (SDK-002)."""
+    return LawSummary(
+        sr_number=law.get("sr_number") or None,
+        title=law["title"],
+        abbreviation=law.get("abbreviation") or None,
+        is_active=bool(law.get("is_active")),
+        short_desc=law.get("short_desc") or None,
+        version_since=(law["version_since"][:10] if law.get("version_since") else None),
+        snippet=law.get("snippet") or None,
+    )
 
 
-def _format_law_detail(law: dict, include_content: bool = False) -> str:
-    """Formatiert ein Gesetz als detaillierte Markdown-Ansicht."""
-    abbr = law.get("abbreviation", "")
-    status = "In Kraft" if law.get("is_active") else "Aufgehoben"
+def _to_detail(law: dict, include_content: bool = False) -> LawDetail:
+    """Konvertiert ein Cache-Gesetz in ein LawDetail-Modell (SDK-002)."""
+    sr = law.get("sr_number") or None
+    zhlex_url = api_client.build_zhlex_search_url(sr) if sr else None
 
-    lines = [
-        f"## {law['title']}",
-        "",
-        "| Feld | Wert |",
-        "|------|------|",
-        f"| **Ordnungsnr.** | {law.get('sr_number', '—')} |",
-        f"| **Abkürzung** | {abbr or '—'} |",
-        f"| **Status** | {status} |",
-    ]
-    if law.get("short_desc"):
-        lines.append(f"| **Kurzbeschreibung** | {law['short_desc']} |")
-    if law.get("version_since"):
-        lines.append(f"| **Version seit** | {law['version_since'][:10]} |")
-    if law.get("family_since"):
-        lines.append(f"| **Erstfassung** | {law['family_since'][:10]} |")
-    if law.get("pdf_url"):
-        lines.append(f"| **PDF** | [Download]({law['pdf_url']}) |")
-    if law.get("html_url"):
-        lines.append(f"| **HTML** | [Online]({law['html_url']}) |")
-
-    # ZH-Lex Link
-    sr = law.get("sr_number", "")
-    if sr:
-        zhlex_url = api_client.build_zhlex_search_url(sr)
-        lines.append(f"| **ZH-Lex** | [zh.ch]({zhlex_url}) |")
-
+    content: str | None = None
+    truncated = False
     if include_content:
-        content = law.get("pdf_content") or law.get("html_content") or ""
-        if content:
-            # Erste 5000 Zeichen (mit Hinweis wenn gekürzt)
-            if len(content) > 5000:
-                content = content[:5000] + "\n\n*[... Text gekürzt — verwende openlex__zhlaw_get_article für einzelne Artikel]*"
-            lines.extend(["", "### Volltext", "", content])
+        raw = law.get("pdf_content") or law.get("html_content") or ""
+        if raw:
+            if len(raw) > 5000:
+                content = raw[:5000]
+                truncated = True
+            else:
+                content = raw
 
-    return "\n".join(lines)
+    return LawDetail(
+        sr_number=sr,
+        title=law["title"],
+        abbreviation=law.get("abbreviation") or None,
+        is_active=bool(law.get("is_active")),
+        short_desc=law.get("short_desc") or None,
+        version_since=(law["version_since"][:10] if law.get("version_since") else None),
+        family_since=(law["family_since"][:10] if law.get("family_since") else None),
+        pdf_url=law.get("pdf_url") or None,
+        html_url=law.get("html_url") or None,
+        zhlex_url=zhlex_url,
+        content=content,
+        content_truncated=truncated,
+    )
 
 
-def _result_header(count: int, total: int, desc: str) -> str:
-    """Standardisierter Ergebnisheader."""
-    if total > count:
-        return f"## {desc}\n**Treffer:** {count} von {total} angezeigt\n"
-    return f"## {desc}\n**Treffer:** {total}\n"
+def _to_article_item(
+    article: Article, law: dict | None = None
+) -> ArticleItem:
+    """Konvertiert ein geparstes Article in ein ArticleItem-Modell (SDK-002)."""
+    sr = (law or {}).get("sr_number") or None
+    return ArticleItem(
+        number=article.number,
+        title=article.title or None,
+        content=article.content,
+        paragraphs=list(article.paragraphs),
+        law=((law or {}).get("abbreviation") or sr) if law else None,
+        law_title=(law or {}).get("title") if law else None,
+        zhlex_url=api_client.build_zhlex_search_url(sr) if sr else None,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -439,7 +436,7 @@ def _result_header(count: int, total: int, desc: str) -> str:
         "openWorldHint": False,
     },
 )
-async def zhlaw_search_laws(params: SearchLawsInput) -> str:
+async def zhlaw_search_laws(params: SearchLawsInput) -> LawListResponse:
     """Volltextsuche in allen Zürcher Gesetzen mit FTS5-Ranking.
 
     Durchsucht Titel, Abkürzungen und Volltexte aller ~970 kantonalen Gesetze.
@@ -448,7 +445,9 @@ async def zhlaw_search_laws(params: SearchLawsInput) -> str:
 
     Beispiele: 'Tagesschule', 'Datenschutz Gemeinde', 'Elternrat OR Elternmitwirkung'.
     """
+    tlog = tool_logger("zhlaw_search_laws")
     try:
+        tlog.info("tool_call", query=params.query, limit=params.limit)
         cache = _get_cache()
         results = cache.search_fulltext(
             params.query,
@@ -458,28 +457,25 @@ async def zhlaw_search_laws(params: SearchLawsInput) -> str:
         )
 
         if not results:
-            tips = [
-                f"Keine Gesetze gefunden für: **{params.query}**",
-                "",
-                "Tipps:",
-                "- Andere Suchbegriffe oder Synonyme versuchen",
-                "- Filter entfernen (active_only, sr_prefix)",
-                "- FTS5-Syntax: 'Begriff1 OR Begriff2'",
-            ]
-            return "\n".join(tips) + SOURCE_FOOTER
+            return LawListResponse(
+                provenance="cache",
+                count=0,
+                message=(
+                    f"Keine Gesetze gefunden für: {params.query}. "
+                    "Andere Suchbegriffe/Synonyme versuchen, Filter entfernen "
+                    "(active_only, sr_prefix) oder FTS5-Syntax 'Begriff1 OR Begriff2'."
+                ),
+            )
 
-        parts = [_result_header(
-            len(results), len(results),
-            f"Zürcher Gesetze: «{params.query}»",
-        )]
-
-        for i, law in enumerate(results, 1):
-            parts.append(_format_law_summary(law, i))
-
-        return "\n\n".join(parts) + SOURCE_FOOTER
+        summaries = [_to_summary(law) for law in results]
+        return LawListResponse(
+            provenance="cache",
+            count=len(summaries),
+            results=summaries,
+        )
 
     except Exception as e:
-        _fail(e, "Volltextsuche")
+        _fail(e, "Volltextsuche", tlog)
 
 
 # ---------------------------------------------------------------------------
@@ -497,7 +493,7 @@ async def zhlaw_search_laws(params: SearchLawsInput) -> str:
         "openWorldHint": False,
     },
 )
-async def zhlaw_get_law(params: GetLawInput) -> str:
+async def zhlaw_get_law(params: GetLawInput) -> LawDetailResponse:
     """Ruft ein Zürcher Gesetz anhand der Ordnungsnummer oder Abkürzung ab.
 
     Liefert Metadaten (Titel, Status, Datum, Links) und optional den Volltext.
@@ -506,22 +502,38 @@ async def zhlaw_get_law(params: GetLawInput) -> str:
     Wichtige Gesetze: VSG (Volksschulgesetz), LPG (Lehrpersonalgesetz),
     PBG (Planungs-/Baugesetz), StG (Steuergesetz), KV (Kantonsverfassung).
     """
+    tlog = tool_logger("zhlaw_get_law")
     try:
+        tlog.info("tool_call", identifier=params.identifier)
         law = _resolve_law(params.identifier)
 
         if not law:
-            return (
-                f"Gesetz nicht gefunden: **{params.identifier}**\n\n"
-                f"Tipps:\n"
-                f"- Ordnungsnummer prüfen (z.B. '412.100' statt '412100')\n"
-                f"- Abkürzung versuchen (z.B. 'VSG')\n"
-                f"- Mit openlex__zhlaw_search_laws nach dem Gesetz suchen"
-            ) + SOURCE_FOOTER
+            return LawDetailResponse(
+                provenance="cache",
+                count=0,
+                message=(
+                    f"Gesetz nicht gefunden: {params.identifier}. "
+                    "Ordnungsnummer prüfen (z.B. '412.100'), Abkürzung versuchen "
+                    "(z.B. 'VSG') oder mit openlex__zhlaw_search_laws suchen."
+                ),
+            )
 
-        return _format_law_detail(law, include_content=params.include_content) + SOURCE_FOOTER
+        detail = _to_detail(law, include_content=params.include_content)
+        message = None
+        if detail.content_truncated:
+            message = (
+                "Volltext auf 5000 Zeichen gekürzt — openlex__zhlaw_get_article "
+                "für einzelne Artikel verwenden."
+            )
+        return LawDetailResponse(
+            provenance="cache",
+            count=1,
+            results=[detail],
+            message=message,
+        )
 
     except Exception as e:
-        _fail(e, "Gesetzesabruf")
+        _fail(e, "Gesetzesabruf", tlog)
 
 
 # ---------------------------------------------------------------------------
@@ -539,7 +551,7 @@ async def zhlaw_get_law(params: GetLawInput) -> str:
         "openWorldHint": False,
     },
 )
-async def zhlaw_get_article(params: GetArticleInput) -> str:
+async def zhlaw_get_article(params: GetArticleInput) -> ArticleResponse:
     """Extrahiert einen einzelnen Artikel aus einem Zürcher Gesetz.
 
     Parst den Gesetzestext und liefert den spezifischen Artikel mit
@@ -548,46 +560,59 @@ async def zhlaw_get_article(params: GetArticleInput) -> str:
 
     Beispiel: law_identifier='VSG', article_number='28' → Art. 28 VSG (Elternmitwirkung).
     """
+    tlog = tool_logger("zhlaw_get_article")
     try:
+        tlog.info(
+            "tool_call",
+            law_identifier=params.law_identifier,
+            article_number=params.article_number,
+        )
         law = _resolve_law(params.law_identifier)
 
         if not law:
-            return (
-                f"Gesetz nicht gefunden: **{params.law_identifier}**\n\n"
-                f"Bitte Ordnungsnummer oder Abkürzung prüfen."
-            ) + SOURCE_FOOTER
+            return ArticleResponse(
+                provenance="cache+parser",
+                count=0,
+                message=(
+                    f"Gesetz nicht gefunden: {params.law_identifier}. "
+                    "Bitte Ordnungsnummer oder Abkürzung prüfen."
+                ),
+            )
 
         content = law.get("pdf_content") or law.get("html_content") or ""
         if not content:
-            return (
-                f"Kein Volltext verfügbar für: **{law['title']}** ({law.get('sr_number', '')})\n\n"
-                f"Der Gesetzestext ist in der Datenquelle nicht vorhanden."
-            ) + SOURCE_FOOTER
+            return ArticleResponse(
+                provenance="cache+parser",
+                count=0,
+                message=(
+                    f"Kein Volltext verfügbar für: {law['title']} "
+                    f"({law.get('sr_number', '')}). "
+                    "Der Gesetzestext ist in der Datenquelle nicht vorhanden."
+                ),
+            )
 
         article = extract_article(content, params.article_number)
 
         if not article:
-            return (
-                f"Art. {params.article_number} nicht gefunden in: "
-                f"**{law['title']}** ({law.get('abbreviation', '')})\n\n"
-                f"Tipps:\n"
-                f"- Artikelnummer prüfen (nur Nummer, ohne 'Art.')\n"
-                f"- Mit openlex__zhlaw_search_articles im Gesetz suchen"
-            ) + SOURCE_FOOTER
+            return ArticleResponse(
+                provenance="cache+parser",
+                count=0,
+                message=(
+                    f"Art. {params.article_number} nicht gefunden in "
+                    f"{law['title']} ({law.get('abbreviation', '')}). "
+                    "Artikelnummer prüfen (nur Nummer, ohne 'Art.') oder mit "
+                    "openlex__zhlaw_search_articles im Gesetz suchen."
+                ),
+            )
 
-        law_name = law.get("abbreviation") or law.get("sr_number", "")
-        result = format_article(article, law_name)
-
-        # Kontext hinzufügen
-        sr = law.get("sr_number", "")
-        if sr:
-            zhlex_url = api_client.build_zhlex_search_url(sr)
-            result += f"\n\n**Gesetz:** [{law['title']}]({zhlex_url})"
-
-        return result + SOURCE_FOOTER
+        return ArticleResponse(
+            provenance="cache+parser",
+            count=1,
+            results=[_to_article_item(article, law)],
+        )
 
     except Exception as e:
-        _fail(e, "Artikelextraktion")
+        _fail(e, "Artikelextraktion", tlog)
 
 
 # ---------------------------------------------------------------------------
@@ -605,7 +630,7 @@ async def zhlaw_get_article(params: GetArticleInput) -> str:
         "openWorldHint": False,
     },
 )
-async def zhlaw_list_laws(params: ListLawsInput) -> str:
+async def zhlaw_list_laws(params: ListLawsInput) -> LawListResponse:
     """Listet Zürcher Gesetze auf mit optionalem Filter nach Rechtsgebiet.
 
     Nützliche Ordnungsnummer-Prefixe:
@@ -616,7 +641,9 @@ async def zhlaw_list_laws(params: ListLawsInput) -> str:
     - 700: Raumplanung und Bau
     - 810: Gesundheit
     """
+    tlog = tool_logger("zhlaw_list_laws")
     try:
+        tlog.info("tool_call", sr_prefix=params.sr_prefix, limit=params.limit, offset=params.offset)
         cache = _get_cache()
         laws, total = cache.list_laws(
             active_only=params.active_only,
@@ -626,34 +653,28 @@ async def zhlaw_list_laws(params: ListLawsInput) -> str:
         )
 
         if not laws:
-            return "Keine Gesetze gefunden mit den angegebenen Filtern." + SOURCE_FOOTER
-
-        desc = "Zürcher Gesetze"
-        if params.sr_prefix:
-            desc += f" (LS {params.sr_prefix}.*)"
-
-        parts = [_result_header(len(laws), total, desc)]
-
-        # Kompakte Tabelle
-        parts.append("| Nr. | Ordnungsnr. | Abk. | Titel |")
-        parts.append("|-----|-------------|------|-------|")
-        for i, law in enumerate(laws, params.offset + 1):
-            abbr = law.get("abbreviation", "")
-            title = law.get("title", "")
-            if len(title) > 60:
-                title = title[:57] + "..."
-            sr = law.get("sr_number", "")
-            parts.append(f"| {i} | {sr} | {abbr} | {title} |")
-
-        if total > params.offset + len(laws):
-            parts.append(
-                f"\n*Weitere Ergebnisse: offset={params.offset + len(laws)}*"
+            return LawListResponse(
+                provenance="cache",
+                count=0,
+                message="Keine Gesetze gefunden mit den angegebenen Filtern.",
             )
 
-        return "\n".join(parts) + SOURCE_FOOTER
+        summaries = [_to_summary(law) for law in laws]
+        message = None
+        if total > params.offset + len(laws):
+            message = (
+                f"{len(laws)} von {total} angezeigt. "
+                f"Weitere Ergebnisse: offset={params.offset + len(laws)}."
+            )
+        return LawListResponse(
+            provenance="cache",
+            count=len(summaries),
+            results=summaries,
+            message=message,
+        )
 
     except Exception as e:
-        _fail(e, "Gesetzesliste")
+        _fail(e, "Gesetzesliste", tlog)
 
 
 # ---------------------------------------------------------------------------
@@ -671,7 +692,7 @@ async def zhlaw_list_laws(params: ListLawsInput) -> str:
         "openWorldHint": False,
     },
 )
-async def zhlaw_find_education_laws(params: FindEducationLawsInput) -> str:
+async def zhlaw_find_education_laws(params: FindEducationLawsInput) -> LawListResponse:
     """Sucht gezielt im Zürcher Bildungsrecht (Ordnungsnummern 412.x).
 
     Spezialisierte Suche für das Schul- und Sportdepartement (SSD).
@@ -681,7 +702,9 @@ async def zhlaw_find_education_laws(params: FindEducationLawsInput) -> str:
 
     Synergie: Fundstelle + swiss-courts-mcp → Rechtsprechung dazu finden.
     """
+    tlog = tool_logger("zhlaw_find_education_laws")
     try:
+        tlog.info("tool_call", query=params.query, limit=params.limit)
         cache = _get_cache()
         results = cache.search_fulltext(
             params.query,
@@ -694,35 +717,34 @@ async def zhlaw_find_education_laws(params: FindEducationLawsInput) -> str:
             # Fallback: breitere Suche ohne Prefix
             broader = cache.search_fulltext(params.query, active_only=True, limit=5)
             if broader:
-                parts = [
-                    f"Keine Treffer im Bildungsrecht (412.x) für: **{params.query}**",
-                    "",
-                    "Aber in anderen Rechtsgebieten gefunden:",
-                    "",
-                ]
-                for i, law in enumerate(broader, 1):
-                    parts.append(_format_law_summary(law, i))
-                return "\n".join(parts) + SOURCE_FOOTER
+                return LawListResponse(
+                    provenance="cache",
+                    count=len(broader),
+                    results=[_to_summary(law) for law in broader],
+                    message=(
+                        f"Keine Treffer im Bildungsrecht (412.x) für: {params.query}. "
+                        "Stattdessen Treffer in anderen Rechtsgebieten."
+                    ),
+                )
 
-            return (
-                f"Keine Gesetze gefunden für: **{params.query}**\n\n"
-                f"Tipps:\n"
-                f"- Synonyme versuchen (z.B. 'Tagesstruktur' statt 'Tagesschule')\n"
-                f"- openlex__zhlaw_search_laws für alle Rechtsgebiete nutzen"
-            ) + SOURCE_FOOTER
+            return LawListResponse(
+                provenance="cache",
+                count=0,
+                message=(
+                    f"Keine Gesetze gefunden für: {params.query}. "
+                    "Synonyme versuchen (z.B. 'Tagesstruktur' statt 'Tagesschule') "
+                    "oder openlex__zhlaw_search_laws für alle Rechtsgebiete nutzen."
+                ),
+            )
 
-        parts = [_result_header(
-            len(results), len(results),
-            f"Bildungsrecht (412.x): «{params.query}»",
-        )]
-
-        for i, law in enumerate(results, 1):
-            parts.append(_format_law_summary(law, i))
-
-        return "\n\n".join(parts) + SOURCE_FOOTER
+        return LawListResponse(
+            provenance="cache",
+            count=len(results),
+            results=[_to_summary(law) for law in results],
+        )
 
     except Exception as e:
-        _fail(e, "Bildungsrecht-Suche")
+        _fail(e, "Bildungsrecht-Suche", tlog)
 
 
 # ---------------------------------------------------------------------------
@@ -740,7 +762,7 @@ async def zhlaw_find_education_laws(params: FindEducationLawsInput) -> str:
         "openWorldHint": False,
     },
 )
-async def zhlaw_search_articles(params: SearchArticlesInput) -> str:
+async def zhlaw_search_articles(params: SearchArticlesInput) -> ArticleResponse:
     """Durchsucht alle Artikel eines bestimmten Gesetzes nach einem Begriff.
 
     Parst das Gesetz in einzelne Artikel und findet alle, die den
@@ -749,39 +771,46 @@ async def zhlaw_search_articles(params: SearchArticlesInput) -> str:
     Beispiel: law_identifier='VSG', query='Elternrat'
     → Findet alle VSG-Artikel die 'Elternrat' erwähnen.
     """
+    tlog = tool_logger("zhlaw_search_articles")
     try:
+        tlog.info("tool_call", law_identifier=params.law_identifier, query=params.query)
         law = _resolve_law(params.law_identifier)
 
         if not law:
-            return (
-                f"Gesetz nicht gefunden: **{params.law_identifier}**"
-            ) + SOURCE_FOOTER
+            return ArticleResponse(
+                provenance="cache+parser",
+                count=0,
+                message=f"Gesetz nicht gefunden: {params.law_identifier}",
+            )
 
         content = law.get("pdf_content") or law.get("html_content") or ""
         if not content:
-            return (
-                f"Kein Volltext verfügbar für: **{law['title']}**"
-            ) + SOURCE_FOOTER
+            return ArticleResponse(
+                provenance="cache+parser",
+                count=0,
+                message=f"Kein Volltext verfügbar für: {law['title']}",
+            )
 
         matching_articles = search_in_articles(content, params.query)
 
         if not matching_articles:
-            return (
-                f"Kein Artikel mit '{params.query}' gefunden in: "
-                f"**{law['title']}** ({law.get('abbreviation', '')})"
-            ) + SOURCE_FOOTER
+            return ArticleResponse(
+                provenance="cache+parser",
+                count=0,
+                message=(
+                    f"Kein Artikel mit '{params.query}' gefunden in "
+                    f"{law['title']} ({law.get('abbreviation', '')})."
+                ),
+            )
 
-        law_name = law.get("abbreviation") or law.get("sr_number", "")
-        header = (
-            f"## Artikel mit «{params.query}» in {law['title']} "
-            f"({law_name})\n"
-            f"**Treffer:** {len(matching_articles)} Artikel\n"
+        return ArticleResponse(
+            provenance="cache+parser",
+            count=len(matching_articles),
+            results=[_to_article_item(a, law) for a in matching_articles],
         )
 
-        return header + "\n" + format_article_list(matching_articles, law_name) + SOURCE_FOOTER
-
     except Exception as e:
-        _fail(e, "Artikelsuche")
+        _fail(e, "Artikelsuche", tlog)
 
 
 # ---------------------------------------------------------------------------
@@ -799,65 +828,52 @@ async def zhlaw_search_articles(params: SearchArticlesInput) -> str:
         "openWorldHint": True,
     },
 )
-async def zhlaw_get_law_metadata(params: GetLawMetadataInput) -> str:
+async def zhlaw_get_law_metadata(params: GetLawMetadataInput) -> MetadataResponse:
     """Ruft aktuelle Metadaten eines Gesetzes live von zh.ch ab.
 
     Liefert den aktuellen Stand direkt von der offiziellen Website:
     Seitentitel, PDF-Links, Änderungsdaten und ZH-Lex URL.
     Nützlich um zu prüfen ob ein Gesetz kürzlich geändert wurde.
     """
+    tlog = tool_logger("zhlaw_get_law_metadata")
     try:
+        tlog.info("tool_call", sr_number=params.sr_number)
         # Zuerst aus Cache für Kontext
         cache = _get_cache()
         cached_law = cache.get_by_sr_number(params.sr_number)
 
         # Live-Metadaten von zh.ch
         metadata = await api_client.fetch_zhlex_metadata(params.sr_number)
-
-        lines = [f"## Metadaten: LS {params.sr_number}"]
-
-        if cached_law:
-            lines.extend([
-                "",
-                f"**Gesetz:** {cached_law['title']}",
-                f"**Abkürzung:** {cached_law.get('abbreviation', '—')}",
-            ])
-
-        lines.append("")
-
-        if metadata.get("found"):
-            lines.append("### Live-Daten von zh.ch")
-            lines.append("")
-
-            if metadata.get("page_title"):
-                lines.append(f"- **Seitentitel:** {metadata['page_title']}")
-            if metadata.get("enactment_date"):
-                lines.append(f"- **Erlassdatum:** {metadata['enactment_date']}")
-            if metadata.get("last_change"):
-                lines.append(f"- **Letzte Änderung:** {metadata['last_change']}")
-
-            lines.append(f"- **ZH-Lex URL:** [{metadata['url']}]({metadata['url']})")
-
-            pdf_links = metadata.get("pdf_links", [])
-            if pdf_links:
-                lines.append("")
-                lines.append("### PDF-Downloads")
-                for link in pdf_links:
-                    lines.append(f"- [PDF]({link})")
-        else:
-            error = metadata.get("error", metadata.get("message", "Unbekannter Fehler"))
-            lines.append(f"**Warnung:** Konnte keine Live-Daten abrufen: {error}")
-            if metadata.get("url"):
-                lines.append(f"- **Versuchte URL:** {metadata['url']}")
-
-        # LexFind-Link
         lexfind_url = api_client.build_lexfind_url(params.sr_number)
-        lines.extend(["", f"**LexFind:** [{lexfind_url}]({lexfind_url})"])
 
-        return "\n".join(lines) + SOURCE_FOOTER
+        found = bool(metadata.get("found"))
+        error = None if found else metadata.get("error") or metadata.get("message")
+        if not found:
+            tlog.warning("metadata_unavailable", sr_number=params.sr_number, error=error)
+
+        item = MetadataItem(
+            sr_number=params.sr_number,
+            found=found,
+            url=metadata.get("url"),
+            page_title=metadata.get("page_title"),
+            enactment_date=metadata.get("enactment_date"),
+            last_change=metadata.get("last_change"),
+            pdf_links=list(metadata.get("pdf_links", [])),
+            lexfind_url=lexfind_url,
+            cached_title=cached_law.get("title") if cached_law else None,
+            cached_abbreviation=cached_law.get("abbreviation") if cached_law else None,
+            error=error,
+        )
+
+        return MetadataResponse(
+            provenance="live",
+            count=1,
+            results=[item],
+            message=None if found else f"Keine Live-Daten von zh.ch: {error}",
+        )
 
     except Exception as e:
-        _fail(e, "Metadaten-Abruf")
+        _fail(e, "Metadaten-Abruf", tlog)
 
 
 # ---------------------------------------------------------------------------
@@ -875,14 +891,16 @@ async def zhlaw_get_law_metadata(params: GetLawMetadataInput) -> str:
         "openWorldHint": True,
     },
 )
-async def zhlaw_update_cache(ctx: Context, params: UpdateCacheInput) -> str:
+async def zhlaw_update_cache(ctx: Context, params: UpdateCacheInput) -> CacheStatusResponse:
     """Aktualisiert den lokalen Cache der Zürcher Gesetzesdaten.
 
     Lädt die neuesten Daten von HuggingFace (rcds/swiss_legislation)
     und aktualisiert die lokale SQLite-Datenbank mit FTS5-Index.
     Normalerweise nur nötig wenn Daten >24h alt sind.
     """
+    tlog = tool_logger("zhlaw_update_cache")
     try:
+        tlog.info("tool_call", force=params.force)
         await ctx.info("Cache-Update gestartet — prüfe Aktualität…")
         cache = _get_cache()
         await ctx.report_progress(progress=0, total=1)
@@ -890,34 +908,45 @@ async def zhlaw_update_cache(ctx: Context, params: UpdateCacheInput) -> str:
         await ctx.report_progress(progress=1, total=1)
 
         status = result.get("status", "unknown")
+        if status not in ("ok", "cache_fresh", "error", "already_loaded"):
+            status = "unknown"
+
         if status == "cache_fresh":
             count = result.get("total", 0)
             await ctx.info(f"Cache ist aktuell — {count} Gesetze im Cache.")
-            return (
-                f"## Cache ist aktuell\n\n"
-                f"**Gesetze im Cache:** {count}\n"
-                f"Der Cache ist weniger als 24 Stunden alt.\n"
-                f"Verwende `force=True` um trotzdem zu aktualisieren."
+            item = CacheStatusItem(
+                status="cache_fresh",
+                total=count,
+                detail="Cache <24h alt. force=True erzwingt Aktualisierung.",
             )
         elif status == "ok":
             loaded = result["loaded"]
             duration = result["duration_s"]
             await ctx.info(f"Cache-Update abgeschlossen: {loaded} Gesetze in {duration}s geladen.")
-            return (
-                f"## Cache aktualisiert\n\n"
-                f"**Geladene Gesetze:** {loaded}\n"
-                f"**Dauer:** {duration}s\n"
-                f"**Quelle:** HuggingFace rcds/swiss_legislation"
+            item = CacheStatusItem(
+                status="ok",
+                loaded=loaded,
+                total=result.get("total", loaded),
+                duration_s=duration,
+                detail="Quelle: HuggingFace rcds/swiss_legislation",
             )
         elif status == "error":
             msg = result.get("message", "Unbekannter Fehler")
             await ctx.warning(f"Cache-Update fehlgeschlagen: {msg}")
-            return f"## Fehler beim Cache-Update\n\n{msg}"
+            tlog.warning("cache_update_error", detail=msg)
+            item = CacheStatusItem(status="error", detail=msg)
         else:
-            return f"## Cache-Status: {status}\n\n**Gesetze:** {result.get('total', 0)}"
+            item = CacheStatusItem(status="unknown", total=result.get("total", 0))
+
+        return CacheStatusResponse(
+            provenance="cache",
+            count=1,
+            results=[item],
+            message=item.detail,
+        )
 
     except Exception as e:
-        _fail(e, "Cache-Update")
+        _fail(e, "Cache-Update", tlog)
 
 
 # ---------------------------------------------------------------------------
@@ -1005,13 +1034,9 @@ def main():
       3. Default                                → stdio
     """
     settings = Settings()
-    # Logging explizit nach stderr — stdout ist dem JSON-RPC-Stream
-    # vorbehalten (OBS-004). level via LOG_LEVEL überschreibbar.
-    logging.basicConfig(
-        stream=sys.stderr,
-        level=settings.log_level.upper(),
-        format="%(asctime)s %(name)s %(levelname)s: %(message)s",
-    )
+    # Strukturiertes JSON-Logging nach stderr — stdout ist dem JSON-RPC-Stream
+    # vorbehalten (OBS-003 / OBS-004). Level via LOG_LEVEL überschreibbar.
+    configure_logging(settings.log_level)
     use_http = settings.mcp_transport == "streamable-http" or "--http" in sys.argv
     if use_http:
         import uvicorn
