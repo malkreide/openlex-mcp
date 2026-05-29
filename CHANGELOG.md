@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "not found" / "no results" responses remain normal guidance results.
 
 ### Security
+- **SEC-004 / SEC-021 / SEC-005**: all outbound HTTP requests now go through a
+  hardened gate (`openlex_mcp/net.py`): HTTPS-only enforcement, a code-layer
+  egress allow-list (`frozenset`, `www.zh.ch`), SSRF IP-blocking of
+  private/loopback/link-local/metadata ranges (incl. `169.254.169.254`), and
+  DNS-pinning (resolve once, connect to the validated IP, preserve `Host` + TLS
+  SNI). Redirects are followed manually and re-validated against the full chain.
+  The shared HTTP client no longer auto-follows redirects. New
+  `docs/network-egress.md` documents the policy and the network-layer companion.
 - **SEC-016**: HTTP transport now defaults to `127.0.0.1` instead of hardcoded
   `0.0.0.0`. Host/port are configurable via `MCP_HOST`/`MCP_PORT` env vars (or
   `--host`/`--port`). Binding to `0.0.0.0` outside a detected container logs a

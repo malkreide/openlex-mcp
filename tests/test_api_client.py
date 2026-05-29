@@ -57,11 +57,20 @@ def test_handle_error_masks_unexpected_exception():
     assert "unerwartet" in msg.lower()
 
 
+def _pin_resolver(ip: str):
+    async def _resolve(_host: str, _port: int) -> list[str]:
+        return [ip]
+
+    return _resolve
+
+
 @respx.mock
 @pytest.mark.asyncio
-async def test_fetch_zhlex_metadata_success():
+async def test_fetch_zhlex_metadata_success(monkeypatch):
+    ip = "203.0.113.10"
+    monkeypatch.setattr(api_client.net, "_resolve", _pin_resolver(ip))
     url = api_client.build_zhlex_search_url("412.100")
-    respx.get(url).mock(
+    respx.get(api_client.net._pin_url(url, ip)).mock(
         return_value=httpx.Response(
             200,
             html="<title>Kanton Zürich - Volksschulgesetz</title>",
@@ -74,12 +83,23 @@ async def test_fetch_zhlex_metadata_success():
 
 @respx.mock
 @pytest.mark.asyncio
-async def test_fetch_zhlex_metadata_404_returns_not_found():
+async def test_fetch_zhlex_metadata_404_returns_not_found(monkeypatch):
+    ip = "203.0.113.10"
+    monkeypatch.setattr(api_client.net, "_resolve", _pin_resolver(ip))
     url = api_client.build_zhlex_search_url("000.0")
-    respx.get(url).mock(return_value=httpx.Response(404))
+    respx.get(api_client.net._pin_url(url, ip)).mock(return_value=httpx.Response(404))
     meta = await api_client.fetch_zhlex_metadata("000.0")
     assert meta["found"] is False
     assert meta["sr_number"] == "000.0"
+
+
+@pytest.mark.asyncio
+async def test_fetch_blocked_when_host_resolves_to_metadata_ip(monkeypatch):
+    # SEC-004: even the fixed host is refused if it resolves to a blocked IP.
+    monkeypatch.setattr(api_client.net, "_resolve", _pin_resolver("169.254.169.254"))
+    meta = await api_client.fetch_zhlex_metadata("412.100")
+    assert meta["found"] is False
+    assert "Egress" in meta["error"]
 
 
 # ---------------------------------------------------------------------------
@@ -107,9 +127,11 @@ async def test_aclose_client_resets_and_recreates():
 
 @respx.mock
 @pytest.mark.asyncio
-async def test_fetch_reuses_shared_client_without_closing():
+async def test_fetch_reuses_shared_client_without_closing(monkeypatch):
+    ip = "203.0.113.10"
+    monkeypatch.setattr(api_client.net, "_resolve", _pin_resolver(ip))
     url = api_client.build_zhlex_search_url("412.100")
-    respx.get(url).mock(
+    respx.get(api_client.net._pin_url(url, ip)).mock(
         return_value=httpx.Response(200, html="<title>Volksschulgesetz</title>")
     )
     before = api_client.get_client()
