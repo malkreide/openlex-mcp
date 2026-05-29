@@ -1,2 +1,2 @@
 server_name,audit_status,findings,last_audit_run,last_audit_at,production_ready,released_version,notes
-openlex-mcp,Findings dokumentiert,31,,,False,,
+openlex-mcp,Alle Findings behoben,31,2026-05-29,2026-05-29T09:41:00Z,True,,31/31 resolved; 28 fixed in code (PRs #2-#14); 3 deferred as accepted-risk in ROADMAP.md (OBS-006/SEC-014/SEC-015); 89 tests passing CI 3.11/3.12/3.13
