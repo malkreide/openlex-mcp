@@ -21,8 +21,10 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from typing import NoReturn
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, Field
 
 from openlex_mcp import api_client
@@ -51,6 +53,21 @@ EDUCATION_SR_PREFIX = "412"
 
 # Globaler Cache (wird beim ersten Tool-Aufruf initialisiert)
 _cache: LawCache | None = None
+
+# Logger schreibt nach stderr (stdout ist dem JSON-RPC-Stream vorbehalten, OBS-004)
+logger = logging.getLogger("openlex_mcp")
+
+
+def _fail(exc: Exception, context: str) -> NoReturn:
+    """Loggt den Originalfehler nach stderr und wirft einen maskierten ToolError.
+
+    Erfüllt OBS-001 (Execution-Errors werden als `isError`-Tool-Result
+    zurückgegeben, nicht als JSON-RPC-Protocol-Error) und OBS-002 (keine
+    Stacktraces / Internals gelangen ans LLM — nur eine handlungsweisende,
+    maskierte Meldung; der Originalfehler bleibt ausschliesslich im Server-Log).
+    """
+    logger.exception("%s fehlgeschlagen", context)
+    raise ToolError(api_client.handle_error(exc, context)) from exc
 
 
 def _get_cache() -> LawCache:
@@ -396,7 +413,7 @@ async def zhlaw_search_laws(params: SearchLawsInput) -> str:
         return "\n\n".join(parts) + SOURCE_FOOTER
 
     except Exception as e:
-        return api_client.handle_error(e, "Volltextsuche")
+        _fail(e, "Volltextsuche")
 
 
 # ---------------------------------------------------------------------------
@@ -438,7 +455,7 @@ async def zhlaw_get_law(params: GetLawInput) -> str:
         return _format_law_detail(law, include_content=params.include_content) + SOURCE_FOOTER
 
     except Exception as e:
-        return api_client.handle_error(e, "Gesetzesabruf")
+        _fail(e, "Gesetzesabruf")
 
 
 # ---------------------------------------------------------------------------
@@ -504,7 +521,7 @@ async def zhlaw_get_article(params: GetArticleInput) -> str:
         return result + SOURCE_FOOTER
 
     except Exception as e:
-        return api_client.handle_error(e, "Artikelextraktion")
+        _fail(e, "Artikelextraktion")
 
 
 # ---------------------------------------------------------------------------
@@ -570,7 +587,7 @@ async def zhlaw_list_laws(params: ListLawsInput) -> str:
         return "\n".join(parts) + SOURCE_FOOTER
 
     except Exception as e:
-        return api_client.handle_error(e, "Gesetzesliste")
+        _fail(e, "Gesetzesliste")
 
 
 # ---------------------------------------------------------------------------
@@ -639,7 +656,7 @@ async def zhlaw_find_education_laws(params: FindEducationLawsInput) -> str:
         return "\n\n".join(parts) + SOURCE_FOOTER
 
     except Exception as e:
-        return api_client.handle_error(e, "Bildungsrecht-Suche")
+        _fail(e, "Bildungsrecht-Suche")
 
 
 # ---------------------------------------------------------------------------
@@ -698,7 +715,7 @@ async def zhlaw_search_articles(params: SearchArticlesInput) -> str:
         return header + "\n" + format_article_list(matching_articles, law_name) + SOURCE_FOOTER
 
     except Exception as e:
-        return api_client.handle_error(e, "Artikelsuche")
+        _fail(e, "Artikelsuche")
 
 
 # ---------------------------------------------------------------------------
@@ -774,7 +791,7 @@ async def zhlaw_get_law_metadata(params: GetLawMetadataInput) -> str:
         return "\n".join(lines) + SOURCE_FOOTER
 
     except Exception as e:
-        return api_client.handle_error(e, "Metadaten-Abruf")
+        _fail(e, "Metadaten-Abruf")
 
 
 # ---------------------------------------------------------------------------
@@ -825,7 +842,7 @@ async def zhlaw_update_cache(params: UpdateCacheInput) -> str:
             return f"## Cache-Status: {status}\n\n**Gesetze:** {result.get('total', 0)}"
 
     except Exception as e:
-        return api_client.handle_error(e, "Cache-Update")
+        _fail(e, "Cache-Update")
 
 
 # ---------------------------------------------------------------------------
@@ -878,6 +895,13 @@ def _resolve_http_host_port() -> tuple[str, int]:
 
 def main():
     """Startet den MCP-Server mit Dual-Transport (stdio oder streamable-http)."""
+    # Logging explizit nach stderr — stdout ist dem JSON-RPC-Stream
+    # vorbehalten (OBS-004). level via LOG_LEVEL überschreibbar.
+    logging.basicConfig(
+        stream=sys.stderr,
+        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(name)s %(levelname)s: %(message)s",
+    )
     if "--http" in sys.argv:
         host, port = _resolve_http_host_port()
         _warn_on_public_binding(host)

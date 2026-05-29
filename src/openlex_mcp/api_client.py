@@ -217,4 +217,6 @@ def handle_error(e: Exception, context: str = "") -> str:
     if isinstance(e, httpx.ConnectError):
         return f"{prefix}Verbindung fehlgeschlagen. Internetverbindung prüfen."
 
-    return f"{prefix}{type(e).__name__}: {e}"
+    # OBS-002: keine Internals (Exception-Typ/Message, Stacktraces, SQL) ans
+    # LLM. Der Originalfehler wird vom Aufrufer nach stderr geloggt.
+    return f"{prefix}Ein unerwarteter interner Fehler ist aufgetreten."

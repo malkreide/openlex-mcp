@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 
 import pytest
+from mcp.server.fastmcp.exceptions import ToolError
 
 import openlex_mcp.server as srv
 
@@ -79,6 +80,58 @@ def test_search_input_rejects_out_of_range_limit():
 def test_metadata_input_rejects_bad_sr_number():
     with pytest.raises(Exception):
         srv.GetLawMetadataInput(sr_number="not-a-number")
+
+
+def test_protocol_error_missing_required_arg_rejected():
+    # OBS-001 (protocol-error path): malformed args are rejected at the schema
+    # boundary before any tool logic runs (the lowlevel server turns this into
+    # an isError result rather than executing the tool).
+    with pytest.raises(Exception):
+        srv.GetArticleInput(law_identifier="VSG")  # article_number fehlt
+
+
+# ---------------------------------------------------------------------------
+# OBS-001 / OBS-002: execution errors are masked isError results, not leaks
+# ---------------------------------------------------------------------------
+
+
+def _boom(*_args, **_kwargs):
+    raise RuntimeError("DB locked at /secret/path/zhlex_cache.db")
+
+
+@pytest.mark.asyncio
+async def test_execution_error_raises_masked_toolerror(server_with_cache, cache, monkeypatch):
+    monkeypatch.setattr(cache, "search_fulltext", _boom)
+    with pytest.raises(ToolError) as excinfo:
+        await srv.zhlaw_search_laws(srv.SearchLawsInput(query="Eltern"))
+    msg = str(excinfo.value)
+    # No internals reach the LLM-facing error message.
+    assert "secret" not in msg.lower()
+    assert "RuntimeError" not in msg
+    assert "DB locked" not in msg
+    # But the actionable context is preserved.
+    assert "Volltextsuche" in msg
+
+
+@pytest.mark.asyncio
+async def test_execution_error_logs_original_to_server_log(
+    server_with_cache, cache, monkeypatch, caplog
+):
+    monkeypatch.setattr(cache, "search_fulltext", _boom)
+    with caplog.at_level(logging.ERROR, logger="openlex_mcp"):
+        with pytest.raises(ToolError):
+            await srv.zhlaw_search_laws(srv.SearchLawsInput(query="Eltern"))
+    # The original error is captured in the server log (with traceback), only.
+    assert any("fehlgeschlagen" in r.message for r in caplog.records)
+    assert any(r.exc_info is not None for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_not_found_is_a_normal_result_not_an_error(server_with_cache):
+    # ARCH-003 / OBS-001: a legitimate "no results" is a normal result with
+    # guidance, NOT an isError — so it must not raise.
+    out = await srv.zhlaw_get_law(srv.GetLawInput(identifier="DOESNOTEXIST"))
+    assert "nicht gefunden" in out
 
 
 # ---------------------------------------------------------------------------
