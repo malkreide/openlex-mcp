@@ -439,11 +439,19 @@ def _to_article_item(
 async def zhlaw_search_laws(params: SearchLawsInput) -> LawListResponse:
     """Volltextsuche in allen Zürcher Gesetzen mit FTS5-Ranking.
 
-    Durchsucht Titel, Abkürzungen und Volltexte aller ~970 kantonalen Gesetze.
-    Unterstützt FTS5-Syntax: AND, OR, NOT, Phrasensuche "...".
-    Ergebnisse nach Relevanz sortiert (BM25-Algorithmus).
+    <use_case>Allgemeine Suche nach einem Rechtsbegriff über alle ~970 kantonalen
+    Gesetze. Wähle dieses Tool wenn das Rechtsgebiet unbekannt ist. Für das
+    Bildungsrecht (412.x) ist openlex__zhlaw_find_education_laws schneller und
+    präziser. Um Artikel innerhalb eines bekannten Gesetzes zu finden, nutze
+    openlex__zhlaw_search_articles.</use_case>
 
-    Beispiele: 'Tagesschule', 'Datenschutz Gemeinde', 'Elternrat OR Elternmitwirkung'.
+    <important_notes>FTS5-Syntax: AND, OR, NOT, Phrasensuche "...". Ergebnisse
+    nach BM25-Relevanz sortiert. Max 50 Treffer pro Aufruf (limit-Parameter).
+    sr_prefix filtert nach Rechtsgebiet (412=Bildung, 331=Steuern, 700=Bau).
+    Sucht im lokalen Cache — Aktualität der Metadaten via
+    openlex__zhlaw_get_law_metadata prüfen.</important_notes>
+
+    <example>query='Elternrat OR Elternmitwirkung', sr_prefix='412', limit=10</example>
     """
     tlog = tool_logger("zhlaw_search_laws")
     try:
@@ -496,11 +504,17 @@ async def zhlaw_search_laws(params: SearchLawsInput) -> LawListResponse:
 async def zhlaw_get_law(params: GetLawInput) -> LawDetailResponse:
     """Ruft ein Zürcher Gesetz anhand der Ordnungsnummer oder Abkürzung ab.
 
-    Liefert Metadaten (Titel, Status, Datum, Links) und optional den Volltext.
-    Unterstützt sowohl LS-Nummern ('412.100') als auch Abkürzungen ('VSG').
+    <use_case>Wenn die Ordnungsnummer oder Abkürzung eines Gesetzes bereits bekannt
+    ist und Metadaten oder Volltext abgerufen werden sollen. Um ein Gesetz erst zu
+    finden, openlex__zhlaw_search_laws oder openlex__zhlaw_find_education_laws
+    vorschalten.</use_case>
 
-    Wichtige Gesetze: VSG (Volksschulgesetz), LPG (Lehrpersonalgesetz),
-    PBG (Planungs-/Baugesetz), StG (Steuergesetz), KV (Kantonsverfassung).
+    <important_notes>Unterstützt LS-Nummern ('412.100') und Abkürzungen ('VSG').
+    include_content=True liefert den Volltext (bis 5000 Zeichen, dann truncated=True).
+    Bei Truncation: openlex__zhlaw_get_article für einzelne Artikel verwenden.
+    Wichtige Gesetze: VSG, LPG, PBG, StG, KV.</important_notes>
+
+    <example>identifier='VSG', include_content=False</example>
     """
     tlog = tool_logger("zhlaw_get_law")
     try:
@@ -554,11 +568,16 @@ async def zhlaw_get_law(params: GetLawInput) -> LawDetailResponse:
 async def zhlaw_get_article(params: GetArticleInput) -> ArticleResponse:
     """Extrahiert einen einzelnen Artikel aus einem Zürcher Gesetz.
 
-    Parst den Gesetzestext und liefert den spezifischen Artikel mit
-    Titel, Absätzen und Volltext. Unterstützt Standard-Artikelnummern
-    (28), Buchstaben-Artikel (28a) und Bis-Artikel (28bis).
+    <use_case>Wenn der genaue Wortlaut eines bestimmten Artikels benötigt wird.
+    Voraussetzung: Gesetz und Artikelnummer sind bekannt. Um zuerst relevante
+    Artikel zu finden: openlex__zhlaw_search_articles nutzen.</use_case>
 
-    Beispiel: law_identifier='VSG', article_number='28' → Art. 28 VSG (Elternmitwirkung).
+    <important_notes>Unterstützt Standard-Artikelnummern (28), Buchstaben-Artikel
+    (28a) und Bis-Artikel (28bis). Liefert Titel, alle Absätze und Volltext des
+    Artikels. Gibt count=0 zurück wenn der Artikel nicht existiert — Artikelnummer
+    ohne 'Art.' angeben (nur die Zahl).</important_notes>
+
+    <example>law_identifier='VSG', article_number='28'</example>
     """
     tlog = tool_logger("zhlaw_get_article")
     try:
@@ -633,13 +652,17 @@ async def zhlaw_get_article(params: GetArticleInput) -> ArticleResponse:
 async def zhlaw_list_laws(params: ListLawsInput) -> LawListResponse:
     """Listet Zürcher Gesetze auf mit optionalem Filter nach Rechtsgebiet.
 
-    Nützliche Ordnungsnummer-Prefixe:
-    - 131: Verfassung und Volksrechte
-    - 170: Verwaltungsrechtspflege
-    - 331: Steuern
-    - 412: Volksschule und Bildung
-    - 700: Raumplanung und Bau
-    - 810: Gesundheit
+    <use_case>Wenn eine strukturierte Übersicht aller Gesetze eines Rechtsgebiets
+    benötigt wird (z.B. alle aktiven Bildungsgesetze). Für gezielte Textsuche ist
+    openlex__zhlaw_search_laws besser; für reines Bildungsrecht
+    openlex__zhlaw_find_education_laws.</use_case>
+
+    <important_notes>sr_prefix filtert nach Ordnungsnummer-Prefix (412=Bildung,
+    331=Steuern, 700=Bau, 131=Verfassung, 810=Gesundheit). active_only=True
+    blendet aufgehobene Gesetze aus. Unterstützt Paginierung via offset.
+    Gibt Titel, Abkürzung, SR-Nummer und Status zurück — keinen Volltext.</important_notes>
+
+    <example>sr_prefix='412', active_only=True, limit=50</example>
     """
     tlog = tool_logger("zhlaw_list_laws")
     try:
@@ -695,12 +718,19 @@ async def zhlaw_list_laws(params: ListLawsInput) -> LawListResponse:
 async def zhlaw_find_education_laws(params: FindEducationLawsInput) -> LawListResponse:
     """Sucht gezielt im Zürcher Bildungsrecht (Ordnungsnummern 412.x).
 
-    Spezialisierte Suche für das Schul- und Sportdepartement (SSD).
-    Durchsucht nur Gesetze der 412er-Serie: Volksschulgesetz (VSG),
-    Volksschulverordnung (VSV), Lehrpersonalgesetz (LPG),
-    Lehrpersonalverordnung (LPVO), Sonderpädagogik-Verordnung (VSM) etc.
+    <use_case>Bevorzuge dieses Tool gegenüber openlex__zhlaw_search_laws wenn die
+    Anfrage klar im Bildungsbereich liegt (Schule, Lehrpersonen, Kindergarten,
+    Sonderpädagogik, Tagesstrukturen). Schneller und präziser als die allgemeine
+    Suche, da nur die 412.x-Serie (VSG, VSV, LPG, LPVO, VSM u.a.) durchsucht
+    wird.</use_case>
 
-    Synergie: Fundstelle + swiss-courts-mcp → Rechtsprechung dazu finden.
+    <important_notes>Sucht ausschliesslich in aktiven 412.x-Gesetzen. Bei keinen
+    Treffern: automatischer Fallback auf alle Rechtsgebiete mit Hinweis im message-
+    Feld. Für Artikel innerhalb eines gefundenen Gesetzes:
+    openlex__zhlaw_search_articles. Synergie: Fundstelle + swiss-courts-mcp
+    → Rechtsprechung finden.</important_notes>
+
+    <example>query='Elternrat', limit=10</example>
     """
     tlog = tool_logger("zhlaw_find_education_laws")
     try:
@@ -765,11 +795,17 @@ async def zhlaw_find_education_laws(params: FindEducationLawsInput) -> LawListRe
 async def zhlaw_search_articles(params: SearchArticlesInput) -> ArticleResponse:
     """Durchsucht alle Artikel eines bestimmten Gesetzes nach einem Begriff.
 
-    Parst das Gesetz in einzelne Artikel und findet alle, die den
-    Suchbegriff im Titel oder Inhalt enthalten.
+    <use_case>Wenn bekannt ist, in welchem Gesetz gesucht werden soll, aber nicht
+    welcher Artikel relevant ist. Liefert alle Treffer-Artikel mit Inhalt.
+    Für einen einzelnen Artikel mit bekannter Nummer:
+    openlex__zhlaw_get_article.</use_case>
 
-    Beispiel: law_identifier='VSG', query='Elternrat'
-    → Findet alle VSG-Artikel die 'Elternrat' erwähnen.
+    <important_notes>Parst das Gesetz in einzelne Artikel und durchsucht Titel und
+    Inhalt. Suche ist case-insensitive, kein FTS5 (einfaches Substring-Match).
+    Gibt count=0 wenn kein Artikel den Begriff enthält. Benötigt Volltext im
+    Cache — bei fehlendem Inhalt: Hinweis im message-Feld.</important_notes>
+
+    <example>law_identifier='VSG', query='Elternrat'</example>
     """
     tlog = tool_logger("zhlaw_search_articles")
     try:
@@ -831,9 +867,17 @@ async def zhlaw_search_articles(params: SearchArticlesInput) -> ArticleResponse:
 async def zhlaw_get_law_metadata(params: GetLawMetadataInput) -> MetadataResponse:
     """Ruft aktuelle Metadaten eines Gesetzes live von zh.ch ab.
 
-    Liefert den aktuellen Stand direkt von der offiziellen Website:
-    Seitentitel, PDF-Links, Änderungsdaten und ZH-Lex URL.
-    Nützlich um zu prüfen ob ein Gesetz kürzlich geändert wurde.
+    <use_case>Wenn der aktuelle Stand eines Gesetzes auf zh.ch geprüft werden
+    soll — z.B. ob es kürzlich geändert wurde, welche PDF-Version aktuell gilt
+    oder welche ZH-Lex URL direkt verlinkt werden kann. Einziges Tool mit
+    Live-HTTP-Aufruf; alle anderen Tools lesen den lokalen Cache.</use_case>
+
+    <important_notes>Macht einen echten HTTP-Request an www.zh.ch (ca. 1–3 s).
+    Erfordert Netzwerkzugang. Liefert: Seitentitel, PDF-Links, Änderungsdatum,
+    ZH-Lex URL. Bei 404 oder Timeout: found=False mit Fehlerdetail im error-Feld.
+    Nur Ordnungsnummern akzeptiert (kein Abkürzungs-Lookup).</important_notes>
+
+    <example>sr_number='412.100'</example>
     """
     tlog = tool_logger("zhlaw_get_law_metadata")
     try:
@@ -894,9 +938,18 @@ async def zhlaw_get_law_metadata(params: GetLawMetadataInput) -> MetadataRespons
 async def zhlaw_update_cache(ctx: Context, params: UpdateCacheInput) -> CacheStatusResponse:
     """Aktualisiert den lokalen Cache der Zürcher Gesetzesdaten.
 
-    Lädt die neuesten Daten von HuggingFace (rcds/swiss_legislation)
-    und aktualisiert die lokale SQLite-Datenbank mit FTS5-Index.
-    Normalerweise nur nötig wenn Daten >24h alt sind.
+    <use_case>Nur aufrufen wenn Gesetzes-Suchergebnisse veraltet wirken oder
+    der Cache explizit neu geladen werden soll. Der Cache wird automatisch beim
+    Start befüllt und ist 24 Stunden gültig — manuelles Update ist selten
+    nötig.</use_case>
+
+    <important_notes>Lädt ~970 Gesetze von HuggingFace (rcds/swiss_legislation)
+    in die lokale SQLite-DB mit FTS5-Index (~25 s erster Lauf). force=False
+    überspringt den Download wenn Cache <24h alt (gibt status='cache_fresh'
+    zurück). force=True erzwingt Neudownload. Erfordert Internetzugang zu
+    HuggingFace.</important_notes>
+
+    <example>force=False</example>
     """
     tlog = tool_logger("zhlaw_update_cache")
     try:
