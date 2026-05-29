@@ -1,0 +1,673 @@
+{
+  "audit_meta": {
+    "audit_id": "2026-05-29T112502-Z-openlex-mcp",
+    "server": "openlex-mcp",
+    "date": "2026-05-29",
+    "auditor": "claude-sonnet-4-6"
+  },
+  "results": {
+    "ARCH-001": {
+      "check_id": "ARCH-001",
+      "category": "ARCH",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "All 8 tools use consistent snake_case with 'openlex__' namespace prefix: openlex__zhlaw_search_laws, openlex__zhlaw_get_law, openlex__zhlaw_get_article, openlex__zhlaw_list_laws, openlex__zhlaw_find_education_laws, openlex__zhlaw_search_articles, openlex__zhlaw_get_law_metadata, openlex__zhlaw_update_cache",
+        "No spaces, dots, brackets, or special chars in any tool name",
+        "snake_case is an accepted convention per check criteria",
+        "Tool descriptions are multi-sentence with context (230-390 chars each)"
+      ],
+      "gaps": [],
+      "notes": "Convention is snake_case (not camelCase which is 'preferred' but check says kebab/snake is 'acceptable'). All descriptions provide use-case context."
+    },
+    "ARCH-002": {
+      "check_id": "ARCH-002",
+      "category": "ARCH",
+      "severity": "medium",
+      "status": "partial",
+      "evidence": [
+        "All tool docstrings are 230-386 chars (well above 50-char minimum, median ~300 chars)",
+        "Descriptions include use-case context and examples: e.g. 'Durchsucht Titel, Abkürzungen und Volltexte aller ~970 kantonalen Gesetze. Unterstützt FTS5-Syntax: AND, OR, NOT, Phrasensuche. Ergebnisse nach Relevanz sortiert (BM25-Algorithmus).'",
+        "Descriptions include known abbreviations, filter prefixes, synergy info"
+      ],
+      "gaps": [
+        "No XML-style <use_case>, <important_notes>, <example> tags in tool descriptions (check requires in at least 80% of tools)",
+        "No explicit <example> blocks with sample inputs",
+        "No 'NOT for...' negative disambiguation between similar tools"
+      ],
+      "notes": "Descriptions are rich enough to be useful but lack the structured XML-tag pattern the check specifically tests for."
+    },
+    "ARCH-003": {
+      "check_id": "ARCH-003",
+      "category": "ARCH",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "All not-found cases return structured responses with count=0 plus actionable message guidance",
+        "zhlaw_find_education_laws has a fallback: searches broader corpus and returns results with 'Keine Treffer im Bildungsrecht (412.x)...' message",
+        "zhlaw_search_laws not-found: 'Andere Suchbegriffe/Synonyme versuchen, Filter entfernen...oder FTS5-Syntax verwenden'",
+        "All messages include what to try next (alternative tool names, parameter adjustments)",
+        "Tested in test_server.py: test_not_found_is_a_normal_result_not_an_error, test_search_laws_no_hits_gives_tips"
+      ],
+      "gaps": [],
+      "notes": "Not-found returns are normal results with guidance, never isError."
+    },
+    "ARCH-004": {
+      "check_id": "ARCH-004",
+      "category": "ARCH",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "Settings class (pydantic_settings BaseSettings) in server.py: mcp_host, mcp_port, mcp_transport, mcp_cors_origins, log_level all from env vars",
+        "Tool handlers use ctx: Context parameter (transport-agnostic), no request.headers access",
+        "Transport selection via MCP_TRANSPORT env var or --http CLI flag",
+        "Dual transport: stdio (default) and streamable-http",
+        "Lifespan pattern with AppContext dataclass for shared resources",
+        "Tests verify: test_settings_defaults, test_settings_reads_env_vars"
+      ],
+      "gaps": [],
+      "notes": "Full IoC: no hardcoded transport, all config via settings object, lifespan-scoped shared HTTP client."
+    },
+    "ARCH-005": {
+      "check_id": "ARCH-005",
+      "category": "ARCH",
+      "severity": "critical",
+      "status": "pass",
+      "evidence": [
+        "No API keys, passwords, tokens, or connection strings found in source code",
+        "Server holds no secrets - all data sources are public (confirmed in docs/secret-management.md)",
+        "Settings class uses pydantic_settings; only non-secret env vars (MCP_HOST, MCP_PORT, MCP_CORS_ORIGINS, LOG_LEVEL)",
+        "No hardcoded values matching secret patterns found in src/"
+      ],
+      "gaps": [
+        "No .env.example file (but acceptable since there are literally no secrets to demonstrate)",
+        "No CI secret scanning workflow (gitleaks/trufflehog)"
+      ],
+      "notes": "Server is intentionally a Stufe 1 no-secrets server. Gaps are minor given context."
+    },
+    "ARCH-006": {
+      "check_id": "ARCH-006",
+      "category": "ARCH",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "8 tools total - well within the recommended <= 12 threshold",
+        "No 1:1 API mapping: tools aggregate internally (e.g. zhlaw_find_education_laws internally calls search_fulltext with prefix filter + fallback)",
+        "Anchor demo query answerable in 1-2 tool calls",
+        "Tools are use-case driven: zhlaw_find_education_laws (412.x domain) vs zhlaw_search_laws (all laws)"
+      ],
+      "gaps": [],
+      "notes": "8 tools is appropriate for the dataset. No API-mapping anti-pattern detected."
+    },
+    "ARCH-007": {
+      "check_id": "ARCH-007",
+      "category": "ARCH",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "Each tool returns atomically complete results: zhlaw_get_law returns full LawDetail including sr_number, title, abbreviation, urls, content",
+        "zhlaw_get_article returns ArticleItem with number, title, content, paragraphs, law, law_title, zhlex_url - complete without follow-up calls",
+        "zhlaw_find_education_laws does internal fallback to broader search, returning a complete result set"
+      ],
+      "gaps": [],
+      "notes": "Tools deliver self-contained responses. No 'helper tools' that return only IDs requiring follow-up."
+    },
+    "ARCH-008": {
+      "check_id": "ARCH-008",
+      "category": "ARCH",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "README.md explicitly documents Tools-only design decision under '### Design Decision: Tools-only (no MCP Resources)' with detailed rationale",
+        "Rationale: parametric lookups, 974 laws corpus too large for static Resources, MCP Resource templates deferred to Phase 2"
+      ],
+      "gaps": [],
+      "notes": "Check passes because the README provides a documented rationale for tools-only approach."
+    },
+    "ARCH-009": {
+      "check_id": "ARCH-009",
+      "category": "ARCH",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "All 8 tools have explicit annotations with all 4 fields: readOnlyHint, destructiveHint, idempotentHint, openWorldHint",
+        "7 read-only tools: readOnlyHint=True, destructiveHint=False, idempotentHint=True",
+        "zhlaw_get_law_metadata: openWorldHint=True (makes live HTTP request to zh.ch)",
+        "zhlaw_update_cache: readOnlyHint=False, openWorldHint=True (downloads from HuggingFace)",
+        "Annotations consistent with actual tool behavior"
+      ],
+      "gaps": [],
+      "notes": "Full annotation coverage on all 8 tools. Values are semantically correct."
+    },
+    "ARCH-011": {
+      "check_id": "ARCH-011",
+      "category": "ARCH",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "src-layout: src/openlex_mcp/ with __init__.py, server.py, api_client.py, etc.",
+        "pyproject.toml with hatchling, [tool.hatch.build.targets.wheel] packages = ['src/openlex_mcp']",
+        "All 5 top-level files present: README.md, README.de.md, CHANGELOG.md, LICENSE, pyproject.toml",
+        "Directories: src/, tests/, .github/workflows/",
+        "CI workflows: ci.yml (test + lint) and publish.yml",
+        "README.de.md has parallel German sections"
+      ],
+      "gaps": [
+        "Server.py is 1053 lines - check suggests >5 tools should have tools/ subdirectory",
+        "CONTRIBUTING.md is English-only (no German equivalent)"
+      ],
+      "notes": "Core structure is sound. Large server.py is a minor deviation but all mandatory files/dirs present."
+    },
+    "ARCH-012": {
+      "check_id": "ARCH-012",
+      "category": "ARCH",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "MCP_PROTOCOL_VERSION = '2025-11-25' constant in server.py line 64",
+        "CHANGELOG.md present in Keep-a-Changelog format",
+        "README.md has '## MCP Protocol Version' section with table showing version, SDK, and where pinned",
+        "Update policy documented in README under MCP Protocol Version section",
+        ".github/dependabot.yml configured for weekly pip + actions updates"
+      ],
+      "gaps": [],
+      "notes": "Protocol version explicitly pinned, CHANGELOG maintained, update policy documented, Dependabot active."
+    },
+    "CH-004": {
+      "check_id": "CH-004",
+      "category": "CH",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "responses.py: SOURCE constant = 'Kanton Zürich Rechtssammlung — HuggingFace rcds/swiss_legislation (CC-BY-SA 4.0) & zh.ch'",
+        "All response envelopes include source field with this attribution string",
+        "provenance field (Literal['cache','live','parser','cache+parser','none']) tracks data origin per response",
+        "README.md documents all data sources with license table; Safety & Limits section includes CC-BY-SA 4.0 attribution"
+      ],
+      "gaps": [],
+      "notes": "Source and license attribution in every tool response via Envelope.source. README documents all data sources with licenses."
+    },
+    "OBS-001": {
+      "check_id": "OBS-001",
+      "category": "OBS",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "_fail() function raises ToolError (isError result) for execution errors - not JSON-RPC protocol errors",
+        "All 8 tool handlers have try/except that routes to _fail() for unexpected exceptions",
+        "Not-found cases return normal results (count=0 + message) - never isError",
+        "test_execution_error_raises_masked_toolerror verifies ToolError raised on execution failure",
+        "test_not_found_is_a_normal_result_not_an_error verifies not-found is a normal result"
+      ],
+      "gaps": [],
+      "notes": "Clean separation: execution errors -> ToolError (isError), not-found -> normal result, schema errors -> rejected before tool runs."
+    },
+    "OBS-002": {
+      "check_id": "OBS-002",
+      "category": "OBS",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "_fail() logs original exception to stderr, then raises ToolError with api_client.handle_error() masked message",
+        "handle_error() explicitly masks unexpected errors: 'Ein unerwarteter interner Fehler ist aufgetreten.'",
+        "No traceback.format_exc() or sys.exc_info() in tool returns",
+        "No print() statements in src/ directory",
+        "test_execution_error_raises_masked_toolerror: verifies 'secret', 'RuntimeError', 'DB locked' do not appear in error"
+      ],
+      "gaps": [
+        "FastMCP() initialized without explicit mask_error_details=True parameter - masking achieved via manual ToolError wrapping pattern"
+      ],
+      "notes": "Effective masking via _fail() + handle_error() pattern. Tests confirm no internals leak."
+    },
+    "OBS-003": {
+      "check_id": "OBS-003",
+      "category": "OBS",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "structlog>=24.1.0 in pyproject.toml dependencies",
+        "logging_config.py: structlog configured with JSONRenderer, TimeStamper, add_log_level, format_exc_info",
+        "tool_logger() binds tool name + uuid correlation_id per call",
+        "All 8 tools use tlog = tool_logger('tool_name') with structured logging",
+        "test_execution_error_logs_structured_context: verifies tool, correlation_id, log_level, context fields"
+      ],
+      "gaps": [],
+      "notes": "Full structlog implementation with JSON output, bound per-tool context."
+    },
+    "OBS-004": {
+      "check_id": "OBS-004",
+      "category": "OBS",
+      "severity": "critical",
+      "status": "pass",
+      "evidence": [
+        "No print() statements found in src/ directory",
+        "logging_config.py: logging.basicConfig(stream=sys.stderr) explicitly",
+        "structlog configured with PrintLoggerFactory(file=sys.stderr)",
+        "Comments: 'JSON-Ausgabe nach stderr (stdout bleibt dem JSON-RPC-Stream vorbehalten, OBS-004)'"
+      ],
+      "gaps": [],
+      "notes": "No print statements; all logging explicitly routed to stderr."
+    },
+    "OBS-006": {
+      "check_id": "OBS-006",
+      "category": "OBS",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "ROADMAP.md deferred-risk table explicitly documents: 'OBS-006 — OpenTelemetry tracing: Single-instance, single-tenant, read-only service. Distributed tracing adds no actionable signal until the service is multi-replica or multi-tenant. Scheduled for Phase 2.'"
+      ],
+      "gaps": [],
+      "notes": "Accepted-risk with documented rationale in ROADMAP.md. Per audit framework, intentionally deferred with documentation upgrades this to pass."
+    },
+    "OPS-001": {
+      "check_id": "OPS-001",
+      "category": "OPS",
+      "severity": "high",
+      "status": "partial",
+      "evidence": [
+        "89 tests across 5 test files: test_server.py (37), test_net.py (12), test_api_client.py (12), test_data_cache.py (11), test_law_parser.py (10)",
+        "respx used for HTTP mocking in test_api_client.py and test_net.py",
+        "CI workflow runs 'pytest tests/ -m \"not live\"' - excludes live tests",
+        "pytest markers registered in pyproject.toml: markers = ['live: live API tests (skipped in CI by default)']"
+      ],
+      "gaps": [
+        "No tests/test_live.py file - no live tests at all (check requires at least 1 live test per tool)",
+        "No separate nightly/manual live test workflow in .github/workflows/"
+      ],
+      "notes": "Strong unit test suite but missing the live test layer entirely. Marker is registered but no live tests exist."
+    },
+    "OPS-002": {
+      "check_id": "OPS-002",
+      "category": "OPS",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "Anchor demo query: 'What does the Volksschulgesetz say about parental involvement? Show me Art. 55 VSG...'",
+        "README.md has all 8 required sections including Architecture (ASCII diagram), Known Limitations, Installation, Configuration",
+        "ASCII architecture diagram showing Claude <-> OpenLex MCP <-> data sources",
+        "Known Limitations section with 5+ specific limits",
+        "README.de.md has parallel German sections",
+        "CHANGELOG.md in Keep-a-Changelog format",
+        "CONTRIBUTING.md present"
+      ],
+      "gaps": [
+        "CONTRIBUTING.md is English-only",
+        "README.de.md missing 'Development Phase' section that appears in README.md"
+      ],
+      "notes": "Comprehensive documentation with anchor demo, architecture diagram, and limits section."
+    },
+    "OPS-003": {
+      "check_id": "OPS-003",
+      "category": "OPS",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "README.md: '## Development Phase - Current phase: Phase 1 — Read-Only. All tools are read-only (readOnlyHint: true)'",
+        "ROADMAP.md: 'Phase 1 — Read-Only (current)' with completed checklist, Phase 1 → Phase 2 transition gates, Phase 2/3 future phases",
+        "Phase 1 → 2 gates documented: Authentication, rate limiting, Lethal Trifecta audit, shared session store, tool allow-list, secret management",
+        "No destructive tools (all readOnlyHint: true, destructiveHint: false)",
+        "ROADMAP.md present at root"
+      ],
+      "gaps": [],
+      "notes": "Explicit Phase 1 declaration with documented transition requirements. Roadmap file present and detailed."
+    },
+    "SCALE-001": {
+      "check_id": "SCALE-001",
+      "category": "SCALE",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "Settings.mcp_transport: Literal['stdio', 'streamable-http'] = 'stdio'",
+        "main(): use_http = settings.mcp_transport == 'streamable-http' or '--http' in sys.argv",
+        "Dockerfile: ENV MCP_TRANSPORT=streamable-http (container default)",
+        "compose.yml: MCP_TRANSPORT: 'streamable-http'",
+        "No WebSocket transport"
+      ],
+      "gaps": [],
+      "notes": "Full dual-transport implementation. Default stdio for local, streamable-http for cloud via env var."
+    },
+    "SCALE-002": {
+      "check_id": "SCALE-002",
+      "category": "SCALE",
+      "severity": "high",
+      "status": "partial",
+      "evidence": [
+        "README.md documents single-instance constraint: 'Single-instance only — horizontal scaling breaks active sessions because there is no shared session store'",
+        "README.md provides scaling guidance: 'add a shared session store OR configure edge LB with Mcp-Session-Id stick-table'"
+      ],
+      "gaps": [
+        "No Redis/shared session store implemented",
+        "No sticky session LB configuration",
+        "Server explicitly documented as single-replica only today"
+      ],
+      "notes": "Limitation is honestly documented with remediation guidance. Single-replica deployment is acceptable for Phase 1."
+    },
+    "SCALE-003": {
+      "check_id": "SCALE-003",
+      "category": "SCALE",
+      "severity": "high",
+      "status": "partial",
+      "evidence": [
+        "CORS middleware exposes Mcp-Session-Id header (SDK-004 satisfied)",
+        "README.md documents: 'configure your edge load balancer to route on the Mcp-Session-Id header with a stick-table'"
+      ],
+      "gaps": [
+        "No HAProxy, NGINX, or Kubernetes ingress configuration for Mcp-Session-Id routing",
+        "No deploy/ or k8s/ directory with LB config",
+        "Single-instance deployment means this is a documented future concern"
+      ],
+      "notes": "Documented as needed but not yet implemented. Acceptable for single-replica Phase 1 deployment."
+    },
+    "SCALE-004": {
+      "check_id": "SCALE-004",
+      "category": "SCALE",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "Dockerfile has 2 FROM statements: 'FROM python:3.11-slim AS builder' and 'FROM python:3.11-slim AS runtime'",
+        "Non-root user: useradd --uid 10001 --gid appgroup --no-create-home --shell /sbin/nologin appuser; USER appuser",
+        "HEALTHCHECK directive present",
+        "Final image based on python:3.11-slim"
+      ],
+      "gaps": [],
+      "notes": "Full multi-stage Dockerfile with named stages, slim base, non-root UID 10001, and HEALTHCHECK."
+    },
+    "SCALE-006": {
+      "check_id": "SCALE-006",
+      "category": "SCALE",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "compose.yml: deploy.resources.limits.memory=512m, cpus='0.5'",
+        "compose.yml: deploy.resources.reservations.memory=256m",
+        "compose.yml: ulimits.nofile soft=1024, hard=2048",
+        "compose.yml: restart: unless-stopped",
+        "HEALTHCHECK in both Dockerfile and compose.yml"
+      ],
+      "gaps": [],
+      "notes": "Full resource limits (memory, CPU, FDs) defined in compose.yml matching Render Starter plan constraints."
+    },
+    "SDK-001": {
+      "check_id": "SDK-001",
+      "category": "SDK",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "app_lifespan() decorated with @asynccontextmanager in server.py",
+        "FastMCP instantiated with lifespan=app_lifespan",
+        "Lifespan creates shared HTTP client via api_client.get_client() on entry",
+        "Lifespan closes client via await api_client.aclose_client() in finally block",
+        "test_lifespan_creates_and_closes_shared_client: verifies client created/closed by lifespan"
+      ],
+      "gaps": [],
+      "notes": "Proper FastMCP lifespan pattern. Single shared httpx.AsyncClient, no per-call creation."
+    },
+    "SDK-002": {
+      "check_id": "SDK-002",
+      "category": "SDK",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "responses.py: Envelope base class with source, provenance, count, message; 5 typed envelope subclasses",
+        "All 8 tools have typed return annotations: -> LawListResponse, -> LawDetailResponse, -> ArticleResponse, -> MetadataResponse, -> CacheStatusResponse",
+        "Typed result item models: LawSummary, LawDetail, ArticleItem, MetadataItem, CacheStatusItem",
+        "provenance Literal type for data origin tracking",
+        "source field with CC-BY-SA attribution string in all responses"
+      ],
+      "gaps": [],
+      "notes": "Complete typed Pydantic v2 response envelope for all 8 tools."
+    },
+    "SDK-003": {
+      "check_id": "SDK-003",
+      "category": "SDK",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "zhlaw_update_cache has ctx: Context parameter",
+        "ctx.info() called at start and on completion",
+        "ctx.report_progress(progress=0, total=1) before and (progress=1, total=1) after operation",
+        "ctx.warning() called on cache update error",
+        "test_update_cache_reports_progress_and_info: verifies ctx.info and ctx.report_progress called"
+      ],
+      "gaps": [
+        "Only zhlaw_update_cache uses ctx; other 7 fast read-only tools omit ctx"
+      ],
+      "notes": "The one tool with potentially long runtime correctly uses full context injection. Fast read-only tools omitting ctx is acceptable."
+    },
+    "SDK-004": {
+      "check_id": "SDK-004",
+      "category": "SDK",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "_build_http_app() adds CORSMiddleware with expose_headers=['Mcp-Session-Id']",
+        "allow_headers includes 'Mcp-Session-Id', 'Last-Event-ID', 'MCP-Protocol-Version'",
+        "allow_origins from Settings().cors_origins_list (no wildcard by default)",
+        "test_http_app_cors_exposes_session_header: verifies Mcp-Session-Id in expose_headers and allow_headers",
+        "test_http_app_cors_origins_from_env: verifies specific origins, no wildcard"
+      ],
+      "gaps": [],
+      "notes": "Full CORS implementation with Mcp-Session-Id exposure, no wildcard origins, env-var-configurable origins."
+    },
+    "SEC-004": {
+      "check_id": "SEC-004",
+      "category": "SEC",
+      "severity": "critical",
+      "status": "pass",
+      "evidence": [
+        "net.py: BLOCKED_NETWORKS covers 169.254.0.0/16 (IMDS), 10.0.0.0/8, 127.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, ::1/128, fc00::/7, fe80::/10",
+        "assert_url_allowed() rejects non-https schemes with EgressError",
+        "_is_blocked_ip() checks all resolved IPs against BLOCKED_NETWORKS",
+        "safe_get() runs full check on every redirect hop",
+        "Parametrized tests for 169.254.169.254, 10.0.0.5, 127.0.0.1, 192.168.1.1, 172.16.0.1, ::1"
+      ],
+      "gaps": [],
+      "notes": "Comprehensive SSRF prevention: HTTPS enforcement, IP blocklist covering all RFC 1918 + link-local + loopback + IMDS ranges."
+    },
+    "SEC-005": {
+      "check_id": "SEC-005",
+      "category": "SEC",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "net.py: _resolve() uses asyncio.getaddrinfo() to resolve host once",
+        "_pin_url() replaces hostname with resolved IP in URL",
+        "safe_get() pins connection to ips[0] with Host header and sni_hostname preserved",
+        "test_safe_get_pins_ip_and_preserves_host_and_sni: verifies Host='www.zh.ch' despite IP target",
+        "test_safe_get_blocks_redirect_to_unlisted_host: verifies redirect gate applies SSRF check"
+      ],
+      "gaps": [],
+      "notes": "DNS pinning properly implemented: one resolve, pin to IP, preserve Host/SNI for TLS validation."
+    },
+    "SEC-006": {
+      "check_id": "SEC-006",
+      "category": "SEC",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "Settings.mcp_transport default = 'stdio'",
+        "main() selects stdio by default unless MCP_TRANSPORT=streamable-http or --http flag",
+        "mcp.run() called without arguments in stdio mode (no network binding)",
+        "test_settings_defaults: verifies mcp_transport defaults to 'stdio'"
+      ],
+      "gaps": [],
+      "notes": "Local default is stdio (no network binding). HTTP mode requires explicit env var or CLI flag."
+    },
+    "SEC-007": {
+      "check_id": "SEC-007",
+      "category": "SEC",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "Multi-stage Dockerfile with non-root user uid 10001",
+        "useradd --uid 10001 --gid appgroup --no-create-home --shell /sbin/nologin appuser",
+        "USER appuser directive before ENTRYPOINT",
+        "python:3.11-slim runtime (minimal attack surface)",
+        "Build tools (build-essential) only in builder stage"
+      ],
+      "gaps": [
+        "No seccomp profile or AppArmor annotations defined",
+        "No readOnlyRootFilesystem K8s security context (not using K8s currently)"
+      ],
+      "notes": "Docker hardening with non-root user and minimal runtime image. Advanced seccomp/AppArmor would be Phase 2+ additions."
+    },
+    "SEC-008": {
+      "check_id": "SEC-008",
+      "category": "SEC",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "pyproject.toml: [project.scripts] openlex-mcp = 'openlex_mcp.server:main' - standard entry point, no custom cmdclass",
+        "No postinstall or preinstall hooks in pyproject.toml",
+        "Build backend is hatchling (pure Python, no native compilation)",
+        "claude_desktop_config.json shows clean installation: python -m openlex_mcp.server",
+        "PyPI publish workflow uses OIDC Trusted Publisher (pypa/gh-action-pypi-publish)"
+      ],
+      "gaps": [],
+      "notes": "Clean installation path. No hidden setup steps. PyPI uses trusted publisher pattern."
+    },
+    "SEC-009": {
+      "check_id": "SEC-009",
+      "category": "SEC",
+      "severity": "critical",
+      "status": "pass",
+      "evidence": [
+        "README Safety section: 'Mcp-Session-Id generated and managed by the MCP SDK (cryptographically secure UUIDs)'",
+        "No custom session ID generation - delegated to FastMCP SDK (UUID v4)",
+        "No user-identity binding documented as intentional: 'auth_model=none is correct for public read-only data'",
+        "ROADMAP.md Phase 1→2 gate: 'Authentication — bind Mcp-Session-Id to the validated sub claim'"
+      ],
+      "gaps": [],
+      "notes": "Session IDs are cryptographically secure (FastMCP UUID v4). No user-identity binding is intentional and documented."
+    },
+    "SEC-013": {
+      "check_id": "SEC-013",
+      "category": "SEC",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "docs/secret-management.md: 'openlex-mcp holds no secrets. All data sources are public and require no credentials'",
+        "No API keys, tokens, passwords in source or config",
+        "Classified as Stufe 1 - plain env vars acceptable",
+        "docs/secret-management.md provides guidance for future secret introduction"
+      ],
+      "gaps": [],
+      "notes": "Server correctly classified as Stufe 1 (no secrets). Documentation covers future guidance."
+    },
+    "SEC-014": {
+      "check_id": "SEC-014",
+      "category": "SEC",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "ROADMAP.md deferred-risk: 'SEC-014 — Tool allow-list gateway: All 8 tools are public read-only data. Default-deny allow-listing is only needed before multi-tenant exposure. Pre-condition: authentication (Phase 2 gate).'",
+        "Explicitly deferred with documented rationale and scheduled remediation path"
+      ],
+      "gaps": [],
+      "notes": "Accepted-risk per ROADMAP.md. Per audit framework, intentionally deferred with documentation upgrades to pass."
+    },
+    "SEC-015": {
+      "check_id": "SEC-015",
+      "category": "SEC",
+      "severity": "medium",
+      "status": "pass",
+      "evidence": [
+        "ROADMAP.md deferred-risk: 'SEC-015 — Pre-flight tool-poisoning detection: No tool-poisoning surface today (static schema, read-only, fixed upstreams). Phase 2 gate.'",
+        "Tool descriptions are static (in code), no dynamic tool loading from external sources"
+      ],
+      "gaps": [],
+      "notes": "Accepted-risk per ROADMAP.md. Per audit framework, intentionally deferred with documentation upgrades to pass."
+    },
+    "SEC-016": {
+      "check_id": "SEC-016",
+      "category": "SEC",
+      "severity": "critical",
+      "status": "pass",
+      "evidence": [
+        "Settings.mcp_host defaults to '127.0.0.1' (not 0.0.0.0)",
+        "_warn_on_public_binding() logs NeighborJack warning for 0.0.0.0 outside container",
+        "_in_container() checks for /.dockerenv, KUBERNETES_SERVICE_HOST, RENDER, RAILWAY_PROJECT_ID",
+        "Dockerfile sets MCP_HOST=0.0.0.0 only for container context",
+        "test_default_http_host_is_localhost, test_warn_on_public_binding_outside_container",
+        "README: 'Never bind to 0.0.0.0 outside a container — NeighborJack risk'"
+      ],
+      "gaps": [],
+      "notes": "Comprehensive 0.0.0.0 binding prevention with container detection, warning, tests, and documentation."
+    },
+    "SEC-018": {
+      "check_id": "SEC-018",
+      "category": "SEC",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "All 8 input models: model_config = ConfigDict(str_strip_whitespace=True, extra='forbid', strict=True)",
+        "All string fields have min_length and max_length constraints",
+        "limit fields have ge=1, le=50 bounds; offset has ge=0",
+        "GetLawMetadataInput: sr_number has pattern validation r'^\\d+[\\d.]*$'",
+        "test_search_input_strict_rejects_string_for_int_limit, test_search_input_strict_rejects_int_for_bool"
+      ],
+      "gaps": [],
+      "notes": "Full Pydantic v2 strict mode with extra='forbid', min/max constraints, and pattern validation on all 8 input models."
+    },
+    "SEC-019": {
+      "check_id": "SEC-019",
+      "category": "SEC",
+      "severity": "critical",
+      "status": "pass",
+      "evidence": [
+        "README Safety: 'Security posture (Lethal Trifecta): Score 1/3: public data only · GET-only egress to www.zh.ch — no POST, no webhooks, no email · no code execution. Structurally safe by design.'",
+        "No private/sensitive data: only public Canton Zurich legislation",
+        "No external send capability: all tool handlers are read-only",
+        "No smtplib, no POST webhooks, no Slack integration"
+      ],
+      "gaps": [],
+      "notes": "Score 1/3 on Lethal Trifecta. Structurally safe for read-only public data server."
+    },
+    "SEC-020": {
+      "check_id": "SEC-020",
+      "category": "SEC",
+      "severity": "critical",
+      "status": "pass",
+      "evidence": [
+        "No os.system(), shell=True, eval(), exec(), or os.popen() found in src/ (grep confirmed clean)",
+        "No subprocess calls in server code",
+        "Database access via SQLite Python library, HTTP via httpx, dataset via datasets library"
+      ],
+      "gaps": [],
+      "notes": "No command injection vectors present. Server uses pure Python libraries for all operations."
+    },
+    "SEC-021": {
+      "check_id": "SEC-021",
+      "category": "SEC",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "net.py: EGRESS_ALLOWLIST = frozenset({'www.zh.ch'}) - immutable, not runtime-mutable",
+        "assert_host_allowed() raises EgressError for any host not in allowlist",
+        "assert_url_allowed() chains: HTTPS check -> host allowlist -> IP blocklist",
+        "docs/network-egress.md: documents code-layer and provides K8s NetworkPolicy example for network-layer",
+        "test_assert_host_allowed_passes_for_listed / test_assert_host_allowed_rejects_unlisted"
+      ],
+      "gaps": [
+        "Network-layer egress policy not implemented in current single-container deployment (documented as recommendation in docs/network-egress.md)"
+      ],
+      "notes": "Code-layer allow-list fully implemented as frozenset. Network-layer documented but deferred for current PaaS deployment."
+    },
+    "SEC-022": {
+      "check_id": "SEC-022",
+      "category": "SEC",
+      "severity": "high",
+      "status": "pass",
+      "evidence": [
+        "All 8 tool names use 'openlex__' namespace prefix preventing cross-server shadowing",
+        "docs/tool-hashes.json: SHA-256 hashes for all 8 tool definitions stored at release time",
+        "tool-hashes.json includes mcp_protocol_version and tool_count fields",
+        "test_tool_names_carry_openlex_namespace_prefix: verifies all registered tools start with 'openlex__'"
+      ],
+      "gaps": [
+        "No CI workflow step automatically regenerates/verifies tool-hashes.json on changes (manual process)"
+      ],
+      "notes": "Namespace prefix and hash snapshot both implemented. Minor gap: hash regeneration is manual rather than automated in CI."
+    }
+  }
+}
