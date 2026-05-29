@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **SDK-002** (breaking — tool output contract): all 8 tools now return a typed,
+  structured response envelope (`openlex_mcp/responses.py`) instead of
+  pre-formatted Markdown strings. Each envelope carries `source`, `provenance`
+  (`Literal["cache","live","parser","cache+parser","none"]`), `result_type`
+  (`Literal`), `count`, an optional human-readable `message`, and a typed
+  `results` list (`LawSummary` / `LawDetail` / `ArticleItem` / `MetadataItem` /
+  `CacheStatusItem`). FastMCP now emits an output schema + `structuredContent`
+  for every tool. "Not found" / "no results" are conveyed via `count=0` +
+  `message` (still normal results, not `isError`).
+
 ### Added
+- **OBS-003**: structured logging via `structlog` (`openlex_mcp/logging_config.py`).
+  JSON to **stderr**, RFC-5424 severities (debug/info/warning/error/critical),
+  and per-tool-call bound context (`tool` name + a fresh `correlation_id`).
+  Each tool logs a `tool_call` event; `_fail` logs `tool_execution_failed` with
+  the bound context and exception info. `structlog>=24.1.0` added as a runtime
+  dependency. `MCP_PROTOCOL_VERSION` / tool-hash snapshot now also covers the
+  new output schemas.
+- **ARCH-011**: repository structure verified complete — `src/` layout,
+  populated `tests/` (89 tests), `README.md` + `README.de.md`, `CHANGELOG.md`,
+  `ROADMAP.md`, `LICENSE`, `pyproject.toml`, and `.github/workflows/`.
 - **SDK-001**: a FastMCP `lifespan` (`@asynccontextmanager`) now manages a
   single, process-wide shared `httpx.AsyncClient` instead of constructing a new
   client on every `zhlaw_get_law_metadata` call; the client is closed on

@@ -141,24 +141,24 @@ Für den Einsatz via **claude.ai im Browser** (z.B. auf verwalteten Arbeitsplät
 
 | Tool | Beschreibung |
 |------|-------------|
-| `zhlaw_search_laws` | Volltextsuche über alle ~970 ZH-Gesetze (FTS5 + BM25-Ranking) |
-| `zhlaw_get_law` | Gesetz nach LS-Nummer (z.B. `412.100`) oder Abkürzung (z.B. `VSG`) abrufen |
-| `zhlaw_list_laws` | Gesetze nach Rechtsgebiet-Prefix auflisten und filtern |
-| `zhlaw_find_education_laws` | Spezialisierte Suche im Bildungsrecht (LS 412.x Serie) |
+| `openlex__zhlaw_search_laws` | Volltextsuche über alle ~970 ZH-Gesetze (FTS5 + BM25-Ranking) |
+| `openlex__zhlaw_get_law` | Gesetz nach LS-Nummer (z.B. `412.100`) oder Abkürzung (z.B. `VSG`) abrufen |
+| `openlex__zhlaw_list_laws` | Gesetze nach Rechtsgebiet-Prefix auflisten und filtern |
+| `openlex__zhlaw_find_education_laws` | Spezialisierte Suche im Bildungsrecht (LS 412.x Serie) |
 
 ### Artikelextraktion
 
 | Tool | Beschreibung |
 |------|-------------|
-| `zhlaw_get_article` | Einzelnen Artikel aus einem Gesetz extrahieren (z.B. Art. 28 VSG) |
-| `zhlaw_search_articles` | In allen Artikeln eines Gesetzes suchen |
+| `openlex__zhlaw_get_article` | Einzelnen Artikel aus einem Gesetz extrahieren (z.B. Art. 28 VSG) |
+| `openlex__zhlaw_search_articles` | In allen Artikeln eines Gesetzes suchen |
 
 ### Metadaten & Cache
 
 | Tool | Beschreibung |
 |------|-------------|
-| `zhlaw_get_law_metadata` | Aktuelle Metadaten von zh.ch abrufen (PDF-Links, Gültigkeit) |
-| `zhlaw_update_cache` | Lokalen Cache von HuggingFace aktualisieren |
+| `openlex__zhlaw_get_law_metadata` | Aktuelle Metadaten von zh.ch abrufen (PDF-Links, Gültigkeit) |
+| `openlex__zhlaw_update_cache` | Lokalen Cache von HuggingFace aktualisieren |
 
 ### Wichtige Rechtsgebiet-Prefixe (LS-Nummern)
 
@@ -175,12 +175,12 @@ Für den Einsatz via **claude.ai im Browser** (z.B. auf verwalteten Arbeitsplät
 
 | Abfrage | Tool |
 |---------|------|
-| *«Was ist das Volksschulgesetz?»* | `zhlaw_get_law` |
-| *«Finde Gesetze zum Datenschutz»* | `zhlaw_search_laws` |
-| *«Zeige Art. 55 VSG»* | `zhlaw_get_article` |
-| *«Welche Bildungsgesetze erwähnen Schulleitung?»* | `zhlaw_find_education_laws` |
-| *«Finde alle Artikel über Elternrat im VSG»* | `zhlaw_search_articles` |
-| *«Ist LS 412.100 noch in Kraft?»* | `zhlaw_get_law_metadata` |
+| *«Was ist das Volksschulgesetz?»* | `openlex__zhlaw_get_law` |
+| *«Finde Gesetze zum Datenschutz»* | `openlex__zhlaw_search_laws` |
+| *«Zeige Art. 55 VSG»* | `openlex__zhlaw_get_article` |
+| *«Welche Bildungsgesetze erwähnen Schulleitung?»* | `openlex__zhlaw_find_education_laws` |
+| *«Finde alle Artikel über Elternrat im VSG»* | `openlex__zhlaw_search_articles` |
+| *«Ist LS 412.100 noch in Kraft?»* | `openlex__zhlaw_get_law_metadata` |
 
 ---
 

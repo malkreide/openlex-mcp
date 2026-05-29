@@ -17,13 +17,14 @@
 - `pydantic-settings` `Settings` class + `MCP_TRANSPORT` env var
 - `openlex__` tool namespace prefix + `docs/tool-hashes.json` release snapshot
 - `MCP_PROTOCOL_VERSION` pinned + Dependabot weekly PRs
-- Pydantic `strict=True` input validation + 87-test CI suite (Python 3.11 / 3.12 / 3.13)
+- Pydantic `strict=True` input validation + 89-test CI suite (Python 3.11 / 3.12 / 3.13)
 - `ctx.report_progress()` / `ctx.info()` / `ctx.warning()` in `zhlaw_update_cache` (SDK-003)
+- Structured logging — `structlog` JSON output to stderr, per-call bound context (OBS-003)
+- Structured response envelopes — typed Pydantic models for all 8 tools (SDK-002)
 
 ### Planned (Phase 1)
 
-- Structured logging — structlog with JSON/logfmt output, per-call context binding (OBS-003)
-- Structured response envelopes — Pydantic TypedDict instead of Markdown strings (SDK-002)
+- _(no open Phase-1 items — all audit findings cleared or accepted-risk)_
 
 ## Phase 1 → Phase 2 Transition Gates
 

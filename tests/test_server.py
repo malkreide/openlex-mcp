@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
+from structlog.testing import capture_logs
 
 import openlex_mcp.server as srv
 
@@ -16,51 +17,75 @@ import openlex_mcp.server as srv
 
 @pytest.mark.asyncio
 async def test_search_laws_returns_hits(server_with_cache):
-    out = await srv.zhlaw_search_laws(srv.SearchLawsInput(query="Elternrat"))
-    assert "412.100" in out
-    assert "Quelle" in out  # SOURCE_FOOTER
+    resp = await srv.zhlaw_search_laws(srv.SearchLawsInput(query="Elternrat"))
+    assert resp.result_type == "law_summaries"
+    assert resp.provenance == "cache"
+    assert resp.count >= 1
+    assert any(law.sr_number == "412.100" for law in resp.results)
+    assert "rcds/swiss_legislation" in resp.source  # provenance text
 
 
 @pytest.mark.asyncio
 async def test_search_laws_no_hits_gives_tips(server_with_cache):
-    out = await srv.zhlaw_search_laws(srv.SearchLawsInput(query="Raumfahrt"))
-    assert "Keine Gesetze gefunden" in out
+    resp = await srv.zhlaw_search_laws(srv.SearchLawsInput(query="Raumfahrt"))
+    assert resp.count == 0
+    assert resp.results == []
+    assert "Keine Gesetze gefunden" in resp.message
 
 
 @pytest.mark.asyncio
 async def test_get_law_by_abbreviation(server_with_cache):
-    out = await srv.zhlaw_get_law(srv.GetLawInput(identifier="VSG"))
-    assert "Volksschulgesetz" in out
+    resp = await srv.zhlaw_get_law(srv.GetLawInput(identifier="VSG"))
+    assert resp.result_type == "law_detail"
+    assert resp.count == 1
+    assert resp.results[0].title == "Volksschulgesetz"
+    assert resp.results[0].abbreviation == "VSG"
 
 
 @pytest.mark.asyncio
 async def test_get_law_not_found(server_with_cache):
-    out = await srv.zhlaw_get_law(srv.GetLawInput(identifier="XYZ"))
-    assert "nicht gefunden" in out
+    resp = await srv.zhlaw_get_law(srv.GetLawInput(identifier="XYZ"))
+    assert resp.count == 0
+    assert "nicht gefunden" in resp.message
+
+
+@pytest.mark.asyncio
+async def test_get_law_includes_content_and_truncation_flag(server_with_cache):
+    resp = await srv.zhlaw_get_law(
+        srv.GetLawInput(identifier="VSG", include_content=True)
+    )
+    assert resp.results[0].content is not None
+    assert resp.results[0].content_truncated is False  # sample text is short
 
 
 @pytest.mark.asyncio
 async def test_get_article_extracts(server_with_cache):
-    out = await srv.zhlaw_get_article(
+    resp = await srv.zhlaw_get_article(
         srv.GetArticleInput(law_identifier="VSG", article_number="28")
     )
-    assert "Art. 28" in out
-    assert "Elternrat" in out
+    assert resp.result_type == "articles"
+    assert resp.count == 1
+    art = resp.results[0]
+    assert art.number == "28"
+    assert "Elternrat" in art.content
+    assert art.law == "VSG"
 
 
 @pytest.mark.asyncio
 async def test_list_laws_active_only(server_with_cache):
-    out = await srv.zhlaw_list_laws(srv.ListLawsInput(active_only=True))
-    assert "412.100" in out
-    assert "999.9" not in out  # aufgehoben
+    resp = await srv.zhlaw_list_laws(srv.ListLawsInput(active_only=True))
+    srs = {law.sr_number for law in resp.results}
+    assert "412.100" in srs
+    assert "999.9" not in srs  # aufgehoben
 
 
 @pytest.mark.asyncio
 async def test_search_articles(server_with_cache):
-    out = await srv.zhlaw_search_articles(
+    resp = await srv.zhlaw_search_articles(
         srv.SearchArticlesInput(law_identifier="VSG", query="Eltern")
     )
-    assert "Art. 28" in out
+    assert resp.count >= 1
+    assert any(a.number == "28" for a in resp.results)
 
 
 # ---------------------------------------------------------------------------
@@ -75,14 +100,18 @@ async def test_update_cache_reports_progress_and_info(server_with_cache):
     ctx.warning = AsyncMock()
     ctx.report_progress = AsyncMock()
 
-    out = await srv.zhlaw_update_cache(ctx, srv.UpdateCacheInput(force=False))
+    resp = await srv.zhlaw_update_cache(ctx, srv.UpdateCacheInput(force=False))
 
     # Must have called info() at least once (start message).
     ctx.info.assert_called()
     # Must have called report_progress() to signal start and completion.
     assert ctx.report_progress.call_count >= 2
-    # Result should still contain the normal status text.
-    assert "Cache" in out
+    # Result is a structured CacheStatusResponse with a Literal status.
+    assert resp.result_type == "cache_status"
+    assert resp.count == 1
+    assert resp.results[0].status in (
+        "ok", "cache_fresh", "already_loaded", "error", "unknown",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -174,24 +203,32 @@ async def test_execution_error_raises_masked_toolerror(server_with_cache, cache,
 
 
 @pytest.mark.asyncio
-async def test_execution_error_logs_original_to_server_log(
-    server_with_cache, cache, monkeypatch, caplog
+async def test_execution_error_logs_structured_context(
+    server_with_cache, cache, monkeypatch
 ):
+    # OBS-003: the original error is logged via structlog with bound per-call
+    # context (tool name + correlation id) and exception info — masked from the
+    # LLM-facing result.
     monkeypatch.setattr(cache, "search_fulltext", _boom)
-    with caplog.at_level(logging.ERROR, logger="openlex_mcp"):
+    with capture_logs() as logs:
         with pytest.raises(ToolError):
             await srv.zhlaw_search_laws(srv.SearchLawsInput(query="Eltern"))
-    # The original error is captured in the server log (with traceback), only.
-    assert any("fehlgeschlagen" in r.message for r in caplog.records)
-    assert any(r.exc_info is not None for r in caplog.records)
+    failed = [e for e in logs if e.get("event") == "tool_execution_failed"]
+    assert failed, "expected a tool_execution_failed log event"
+    entry = failed[0]
+    assert entry["tool"] == "zhlaw_search_laws"
+    assert "correlation_id" in entry
+    assert entry["log_level"] == "error"
+    assert entry["context"] == "Volltextsuche"
 
 
 @pytest.mark.asyncio
 async def test_not_found_is_a_normal_result_not_an_error(server_with_cache):
     # ARCH-003 / OBS-001: a legitimate "no results" is a normal result with
     # guidance, NOT an isError — so it must not raise.
-    out = await srv.zhlaw_get_law(srv.GetLawInput(identifier="DOESNOTEXIST"))
-    assert "nicht gefunden" in out
+    resp = await srv.zhlaw_get_law(srv.GetLawInput(identifier="DOESNOTEXIST"))
+    assert resp.count == 0
+    assert "nicht gefunden" in resp.message
 
 
 # ---------------------------------------------------------------------------
