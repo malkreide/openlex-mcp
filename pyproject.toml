@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name        = "openlex-mcp"
-version     = "0.1.0"
+version     = "0.2.0"
 description = "MCP Server for Canton Zurich legislation (ZH-Lex) — full-text search, article extraction, and education law tools"
 readme      = "README.md"
 license     = { file = "LICENSE" }
@@ -17,7 +17,7 @@ keywords = [
 ]
 
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
