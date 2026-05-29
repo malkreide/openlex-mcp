@@ -1,2 +1,2 @@
 server_name,audit_status,findings,last_audit_run,last_audit_at,production_ready,released_version,notes
-openlex-mcp,Re-Audit bestanden,4,2026-05-29T112502-Z-openlex-mcp,2026-05-29T11:25:02Z,True,,Re-Audit: 40/44 pass 4/44 partial 0 fail; production_ready=True; ARCH-002 (medium/open) SCALE-002+SCALE-003 (high/accepted-risk) OPS-001 (high/open)
+openlex-mcp,Abgeschlossen,2,2026-05-29T112502-Z-openlex-mcp,2026-05-29T11:25:02Z,True,,Re-Audit abgeschlossen: ARCH-002 (PR#18) + OPS-001 (PR#17) gefixt; SCALE-002+003 accepted-risk (Phase-2-Gate); 0 offene Findings; production_ready=True

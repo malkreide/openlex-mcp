@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.2.0] — 2026-05-29
+
+First production-ready release. Resolves all 31 findings from the initial MCP
+best-practice audit plus the 4 findings from the follow-up re-audit
+(2026-05-29T112502-Z): 40/44 checks pass, 0 fail, `production_ready: true`.
+SCALE-002/003 remain documented accepted-risk Phase-2 gates.
+
 ### Changed
+- **ARCH-002**: all 8 tool docstrings now carry structured `<use_case>`,
+  `<important_notes>`, and `<example>` tags. The tags disambiguate similar tools
+  (e.g. `find_education_laws` vs `search_laws`, `get_article` vs
+  `search_articles`), surface caveats (FTS5 syntax, content truncation, live-HTTP
+  cost, cache-vs-live), and give concrete example inputs. `docs/tool-hashes.json`
+  updated to reflect the new description hashes.
 - **SDK-002** (breaking — tool output contract): all 8 tools now return a typed,
   structured response envelope (`openlex_mcp/responses.py`) instead of
   pre-formatted Markdown strings. Each envelope carries `source`, `provenance`
@@ -66,8 +79,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Zuerich`), which made `zhlaw_get_law_metadata` raise `UnicodeEncodeError`.
 
 ### Added
-- **OPS-001**: test suite under `tests/` (44 unit tests) covering the law
-  parser, SQLite/FTS5 cache, zh.ch client (respx-mocked), tool handlers, input
+- **OPS-001** (live tests): `tests/test_live.py` adds 8 `@pytest.mark.live` tests
+  (one per tool) that exercise the real upstreams — a module-scoped fixture loads
+  the full HuggingFace dataset once, and `test_live_get_law_metadata` makes a real
+  HTTP request to zh.ch. New `.github/workflows/live.yml` runs them nightly
+  (04:00 UTC) and on manual `workflow_dispatch`; regular CI continues to exclude
+  them via `-m "not live"`. No credentials required (public APIs).
+- **OPS-001** (unit tests): test suite under `tests/` (89 unit tests) covering the
+  law parser, SQLite/FTS5 cache, zh.ch client (respx-mocked), tool handlers, input
   validation, and the SEC-016 binding logic. Removed an unused `StrEnum` import.
 - **SEC-007 / SCALE-004**: multi-stage `Dockerfile` for the Render cloud
   deployment. Builder stage installs deps; slim `python:3.11-slim` runtime stage
