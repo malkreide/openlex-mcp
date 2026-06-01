@@ -54,8 +54,30 @@ def test_assert_host_allowed_rejects_unlisted():
 
 @pytest.mark.asyncio
 async def test_assert_url_allowed_rejects_non_https():
+    # www.zh.ch ist NICHT in HTTP_ALLOWED_HOSTS → HTTP bleibt verboten.
     with pytest.raises(net.EgressError):
         await net.assert_url_allowed("http://www.zh.ch/x")
+
+
+def test_assert_host_allowed_passes_for_legacy_permalink_host():
+    net.assert_host_allowed("www.zhlex.zh.ch")  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_assert_url_allowed_accepts_http_for_legacy_host(monkeypatch):
+    # www.zhlex.zh.ch liefert nur über HTTP aus → ausnahmsweise erlaubt.
+    monkeypatch.setattr(net, "_resolve", _fake_resolve("203.0.113.10"))
+    ips = await net.assert_url_allowed(
+        "http://www.zhlex.zh.ch/Erlass.html?Open&Ordnr=412.100"
+    )
+    assert ips == ["203.0.113.10"]
+
+
+@pytest.mark.asyncio
+async def test_assert_url_allowed_rejects_http_for_non_legacy_host():
+    # Ein unbekannter Host darf auch dann kein HTTP, wenn er gelistet wäre.
+    with pytest.raises(net.EgressError):
+        await net.assert_url_allowed("http://evil.example.com/x")
 
 
 @pytest.mark.asyncio

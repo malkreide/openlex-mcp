@@ -4,7 +4,8 @@ Verteidigung gegen SSRF, DNS-Rebinding und unkontrollierten Egress für alle
 ausgehenden HTTP-Requests des Servers.
 
 Drei Schutzschichten (Code-Layer):
-  - **HTTPS-Enforcement** — nur `https://` ist erlaubt (SEC-004).
+  - **HTTPS-Enforcement** — `https://` ist die Regel; `http://` nur für explizit
+    gelistete Legacy-Hosts (`HTTP_ALLOWED_HOSTS`), siehe SEC-004.
   - **Egress-Allow-List** — nur explizit gelistete Hosts (SEC-021).
   - **SSRF-IP-Block + DNS-Pinning** — der Host wird **einmal** aufgelöst, jede
     resultierende IP gegen private/loopback/link-local/Metadata-Ranges geprüft,
@@ -28,7 +29,17 @@ import httpx
 
 # Code-Layer-Egress-Allow-List — bewusst ein FrozenSet, nicht zur Laufzeit
 # mutierbar. Erweiterungen siehe docs/network-egress.md.
-EGRESS_ALLOWLIST: frozenset[str] = frozenset({"www.zh.ch"})
+#   - www.zh.ch       : aktuelle Gesetzessammlung (HTTPS).
+#   - www.zhlex.zh.ch : stabile Ordnungsnummer-Permalinks (Erlass.html?Ordnr=…).
+#     Dieser Legacy-Dienst liefert nur über HTTP aus (siehe HTTP_ALLOWED_HOSTS).
+EGRESS_ALLOWLIST: frozenset[str] = frozenset({"www.zh.ch", "www.zhlex.zh.ch"})
+
+# Hosts, für die ausnahmsweise HTTP (statt HTTPS) erlaubt ist. Die übrigen
+# Schutzschichten (Allow-List, IP-Block, DNS-Pinning, Redirect-Gate) gelten
+# unverändert. www.zhlex.zh.ch stellt die stabilen Ordnungsnummer-Permalinks
+# nur unverschlüsselt bereit; Redirects auf https://www.zh.ch durchlaufen die
+# Prüfkette erneut und bleiben damit abgesichert.
+HTTP_ALLOWED_HOSTS: frozenset[str] = frozenset({"www.zhlex.zh.ch"})
 
 # Nicht-routbare / interne Bereiche, inkl. Cloud-Metadata 169.254.169.254.
 BLOCKED_NETWORKS: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = tuple(
@@ -86,13 +97,22 @@ async def assert_url_allowed(url: str) -> list[str]:
     Erfüllt SEC-004 (HTTPS + IP-Blocklist) und SEC-021 (Host-Allow-List).
     """
     parsed = urlparse(url)
-    if parsed.scheme != "https":
-        raise EgressError(f"Nur HTTPS erlaubt, erhalten: {parsed.scheme!r}.")
     host = parsed.hostname
     if not host:
         raise EgressError(f"URL ohne Host: {url!r}.")
+    # HTTPS ist die Regel; HTTP nur für explizit gelistete Legacy-Hosts.
+    if parsed.scheme == "https":
+        pass
+    elif parsed.scheme == "http" and host in HTTP_ALLOWED_HOSTS:
+        pass
+    else:
+        raise EgressError(
+            f"Schema {parsed.scheme!r} für Host {host!r} nicht erlaubt "
+            "(HTTPS erforderlich)."
+        )
     assert_host_allowed(host)
-    ips = await _resolve(host, parsed.port or 443)
+    default_port = 80 if parsed.scheme == "http" else 443
+    ips = await _resolve(host, parsed.port or default_port)
     if not ips:
         raise EgressError(f"Keine DNS-Auflösung für '{host}'.")
     for ip in ips:

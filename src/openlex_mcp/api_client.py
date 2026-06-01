@@ -25,6 +25,10 @@ from openlex_mcp import net
 # ---------------------------------------------------------------------------
 
 ZHLEX_BASE = "https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessammlung"
+# Legacy-Permalink-Dienst: stabile URL pro Ordnungsnummer (nur HTTP). Leitet
+# auf die aktuelle Fassung unter www.zh.ch weiter. Wird für den Live-Abruf
+# verwendet, weil www.zh.ch keine undatierte Erlass-URL mehr bereitstellt.
+ZHLEX_PERMALINK_BASE = "http://www.zhlex.zh.ch/Erlass.html"
 LEXFIND_BASE = "https://www.lexfind.ch"
 
 REQUEST_TIMEOUT = 30.0
@@ -53,6 +57,20 @@ def build_zhlex_search_url(sr_number: str) -> str:
     # Ordnungsnummer für URL konvertieren: 412.100 → 412_100
     sr_url = _SR_TO_URL_PATTERN.sub("_", sr_number)
     return f"{ZHLEX_BASE}/zhlex-ls/erlass-{sr_url}.html"
+
+
+def build_zhlex_permalink_url(sr_number: str) -> str:
+    """Baut den stabilen Ordnungsnummer-Permalink auf www.zhlex.zh.ch.
+
+    Args:
+        sr_number: z.B. '412.100'
+
+    Returns:
+        URL zur aktuellen Fassung des Erlasses (leitet auf www.zh.ch weiter).
+        Im Gegensatz zur datierten www.zh.ch-URL ist dieser Link allein aus der
+        Ordnungsnummer ableitbar und stabil.
+    """
+    return f"{ZHLEX_PERMALINK_BASE}?Open&Ordnr={sr_number}"
 
 
 def build_lexfind_url(sr_number: str) -> str:
@@ -123,10 +141,15 @@ async def fetch_zhlex_metadata(sr_number: str) -> dict:
     Returns:
         Dict mit Metadaten oder Fehlermeldung.
     """
-    url = build_zhlex_search_url(sr_number)
+    # Stabiler Ordnungsnummer-Permalink (www.zhlex.zh.ch) statt der datierten
+    # www.zh.ch-URL — letztere ist allein aus der Ordnungsnummer nicht ableitbar.
+    # Der Permalink leitet via Redirect auf die aktuelle Fassung weiter; jeder
+    # Redirect-Hop durchläuft die volle net.safe_get-Prüfkette erneut.
+    url = build_zhlex_permalink_url(sr_number)
 
     # Geteilten Client wiederverwenden (nicht schliessen — Lifespan-scoped).
-    # net.safe_get erzwingt HTTPS + Egress-Allow-List + SSRF-IP-Block + DNS-Pinning.
+    # net.safe_get erzwingt HTTPS (HTTP nur für gelistete Hosts) + Egress-Allow-
+    # List + SSRF-IP-Block + DNS-Pinning.
     client = get_client()
     try:
         response, final_url = await net.safe_get(client, url)

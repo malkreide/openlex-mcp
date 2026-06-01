@@ -60,6 +60,34 @@ def test_extract_article_missing_returns_none():
     assert extract_article(SAMPLE, "999") is None
 
 
+# Einzeiliger PDF-Extrakt ohne separate Titelzeile: § 1 läuft direkt in den
+# Absatztext, inkl. Querverweis "gemäss §§ 33". Früher verschluckte das
+# Titel-Feld den gesamten Fliesstext und content blieb leer (Live-Test-Regression).
+SINGLE_LINE = (
+    "412.100 Volksschulgesetz (VSG)  "
+    "§ 1.  1 Dieses Gesetz regelt die Bildung und Erziehung in der "
+    "Volks- schule einschliesslich der Sonderschulung gemäss  §§ 33–36.  "
+    "2 Es gilt sinngemäss auch für Privatschulen.  "
+    "§ 2.  Die Volksschule umfasst Kindergarten und Primarstufe."
+)
+
+
+def test_extract_article_single_line_pdf_has_content():
+    art = extract_article(SINGLE_LINE, "1")
+    assert art is not None
+    assert art.number == "1"
+    # Der Inhalt darf nicht leer sein und muss den Fliesstext enthalten.
+    assert art.content, "Article content must not be empty"
+    assert "Dieses Gesetz regelt" in art.content
+
+
+def test_extract_article_single_line_pdf_second_article():
+    art = extract_article(SINGLE_LINE, "2")
+    assert art is not None
+    assert art.number == "2"
+    assert "Volksschule umfasst" in art.content
+
+
 def test_search_in_articles_finds_term():
     hits = search_in_articles(SAMPLE, "Elternrat")
     assert len(hits) == 1

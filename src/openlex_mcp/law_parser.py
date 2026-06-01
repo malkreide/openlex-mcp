@@ -47,17 +47,62 @@ class ParsedLaw:
 # Regex-Patterns
 # ---------------------------------------------------------------------------
 
-# Artikel-Erkennung: "Art. 28", "Art. 28a", "§ 28", "Artikel 28bis"
-# Unterstützt sowohl mehrzeilige Texte als auch einzeilige PDF-Extrakte
+# Artikel-Marker: "Art. 28", "Art. 28a", "§ 28", "Artikel 28bis"
+# Erkennt nur den Marker (Nummer + Trenner) und dient der Bestimmung der
+# Artikelgrenzen. Titel und Inhalt werden danach aus dem Textkörper
+# zwischen zwei Markern abgeleitet (siehe _split_title_content) — so geht
+# bei einzeiligen PDF-Extrakten ohne separate Titelzeile kein Inhalt mehr
+# verloren (der gesamte Fliesstext landet sonst fälschlich im Titel).
 _ARTICLE_PATTERN = re.compile(
     r"(?:^|\n|\s{2,})"                     # Zeilenanfang oder Einrückung
     r"\s*"
     r"(?:Art\.?(?:ikel)?|§)\s*"            # "Art.", "Artikel", "§"
     r"(\d+[a-z]?(?:bis|ter|quater)?)"      # Nummer: 28, 28a, 28bis
-    r"(?:\.\s*|\s+)"                        # Punkt oder Leerzeichen
-    r"(.*?)(?=\s{2,}(?:Art|§)|\n|$)",       # Titel bis zum nächsten Artikel oder Zeilenende
+    r"(?:\.\s*|\s+)",                       # Punkt oder Leerzeichen nach der Nummer
     re.MULTILINE | re.IGNORECASE,
 )
+
+# Satzende-Interpunktion — eine echte Marginalie (Randtitel) endet nicht damit.
+_SENTENCE_END = (".", ":", "!", "?", ";")
+
+# Maximale Länge einer Marginalie (Randtitel). Längere erste Zeilen gelten
+# als Fliesstext und werden vollständig als Inhalt behandelt.
+_MAX_TITLE_LEN = 80
+
+
+def _split_title_content(body: str) -> tuple[str, str]:
+    """Trennt einen optionalen Randtitel (Marginalie) vom Artikelinhalt.
+
+    Gut formatierte Texte tragen die Marginalie auf der Artikel-Zeile, gefolgt
+    von einem Zeilenumbruch und dem Absatztext (``Art. 28 Elternmitwirkung\\n
+    Die Eltern …``). Einzeilige PDF-Extrakte haben dagegen keine separate
+    Titelzeile — dort ist der gesamte Körper Inhalt und der Titel bleibt leer.
+
+    Heuristik: Die erste Zeile gilt nur dann als Titel, wenn ihr weiterer
+    Inhalt folgt, sie kurz ist, nicht mit einer Ziffer beginnt (Absatzmarker)
+    und nicht satzartig endet.
+    """
+    body = body.strip()
+    if not body:
+        return "", ""
+
+    nl = body.find("\n")
+    if nl == -1:
+        return "", body
+
+    first = body[:nl].strip()
+    rest = body[nl + 1:].strip()
+
+    if (
+        rest
+        and first
+        and len(first) <= _MAX_TITLE_LEN
+        and not first[:1].isdigit()
+        and not first.endswith(_SENTENCE_END)
+    ):
+        return first, rest
+
+    return "", body
 
 # Absatz-Erkennung: Superscript-Ziffern ¹²³⁴⁵⁶⁷⁸⁹
 _PARAGRAPH_PATTERN = re.compile(
@@ -144,12 +189,16 @@ def parse_law_text(text: str) -> list[Article]:
 
     for i, match in enumerate(matches):
         number = match.group(1).strip()
-        title = match.group(2).strip().rstrip(".")
 
-        # Artikeltext: von nach dem Titel bis zum nächsten Artikel
+        # Körper: vom Ende des Markers bis zum nächsten Artikel.
         start = match.end()
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        content = text[start:end].strip()
+        body = text[start:end].strip()
+
+        # Optionalen Randtitel vom Inhalt trennen. Bei einzeiligen
+        # PDF-Extrakten bleibt der Titel leer und der gesamte Körper ist Inhalt.
+        title, content = _split_title_content(body)
+        title = title.rstrip(".")
 
         # Absätze extrahieren (Superscript-Ziffern)
         paragraphs: list[str] = []

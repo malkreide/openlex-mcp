@@ -14,6 +14,11 @@ def test_build_zhlex_search_url_converts_dot_to_underscore():
     assert "erlass-412_100.html" in url
 
 
+def test_build_zhlex_permalink_url_uses_ordnungsnummer():
+    url = api_client.build_zhlex_permalink_url("412.100")
+    assert url == "http://www.zhlex.zh.ch/Erlass.html?Open&Ordnr=412.100"
+
+
 def test_build_lexfind_url_contains_query_and_canton():
     url = api_client.build_lexfind_url("412.100")
     assert "query=412.100" in url
@@ -69,7 +74,7 @@ def _pin_resolver(ip: str):
 async def test_fetch_zhlex_metadata_success(monkeypatch):
     ip = "203.0.113.10"
     monkeypatch.setattr(api_client.net, "_resolve", _pin_resolver(ip))
-    url = api_client.build_zhlex_search_url("412.100")
+    url = api_client.build_zhlex_permalink_url("412.100")
     respx.get(api_client.net._pin_url(url, ip)).mock(
         return_value=httpx.Response(
             200,
@@ -86,7 +91,7 @@ async def test_fetch_zhlex_metadata_success(monkeypatch):
 async def test_fetch_zhlex_metadata_404_returns_not_found(monkeypatch):
     ip = "203.0.113.10"
     monkeypatch.setattr(api_client.net, "_resolve", _pin_resolver(ip))
-    url = api_client.build_zhlex_search_url("000.0")
+    url = api_client.build_zhlex_permalink_url("000.0")
     respx.get(api_client.net._pin_url(url, ip)).mock(return_value=httpx.Response(404))
     meta = await api_client.fetch_zhlex_metadata("000.0")
     assert meta["found"] is False
@@ -130,7 +135,7 @@ async def test_aclose_client_resets_and_recreates():
 async def test_fetch_reuses_shared_client_without_closing(monkeypatch):
     ip = "203.0.113.10"
     monkeypatch.setattr(api_client.net, "_resolve", _pin_resolver(ip))
-    url = api_client.build_zhlex_search_url("412.100")
+    url = api_client.build_zhlex_permalink_url("412.100")
     respx.get(api_client.net._pin_url(url, ip)).mock(
         return_value=httpx.Response(200, html="<title>Volksschulgesetz</title>")
     )

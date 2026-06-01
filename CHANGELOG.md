@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Live tests** — repaired three nightly live-test regressions caused by upstream
+  drift:
+  - `zhlaw_get_article` returned empty `content` for single-line PDF extracts
+    (e.g. VSG § 1): the article parser captured the whole running text into the
+    title. The parser now derives the marginal-note title and the body separately
+    so `content` is never empty for run-on lines. Offline regression tests added.
+  - `zhlaw_get_law_metadata` no longer resolved on zh.ch — the undated
+    `erlass-<ordnr>.html` landing URL was removed upstream (returns 404). Live
+    metadata now uses the stable per-ordinance permalink
+    `http://www.zhlex.zh.ch/Erlass.html?Open&Ordnr=<ordnr>`, which redirects to
+    the current consolidated version on `www.zh.ch`.
+  - `test_live_list_laws` asserted a brittle SR-prefix that does not hold for the
+    first page (laws are sorted ascending by ordinance number); it now checks the
+    real invariant (non-empty, ascending `sr_number`s).
+
+### Changed
+- **Egress allow-list (SEC-021 / SEC-004)** — added `www.zhlex.zh.ch` to
+  `EGRESS_ALLOWLIST` and introduced `HTTP_ALLOWED_HOSTS` so that this single
+  legacy permalink host may be reached over HTTP (it has no HTTPS endpoint).
+  HTTPS remains mandatory for every other host; the allow-list, SSRF IP-block,
+  DNS-pinning, and per-hop redirect gate are unchanged. See
+  `docs/network-egress.md`.
+
 ## [v0.2.0] — 2026-05-29
 
 First production-ready release. Resolves all 31 findings from the initial MCP
