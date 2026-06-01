@@ -1,8 +1,10 @@
 # Network Egress Policy
 
-This server makes outbound HTTP requests to exactly one host at runtime
-(`www.zh.ch`, for live legislation metadata). Dataset downloads from HuggingFace
-go through the `datasets` library, not the server's HTTP client.
+This server makes outbound HTTP requests to two hosts at runtime:
+`www.zh.ch` (current legislation pages, HTTPS) and `www.zhlex.zh.ch` (stable
+per-ordinance permalinks for live metadata; this legacy service is HTTP-only and
+redirects to `www.zh.ch`). Dataset downloads from HuggingFace go through the
+`datasets` library, not the server's HTTP client.
 
 ## Code-layer egress allow-list (SEC-021)
 
@@ -10,9 +12,12 @@ All outbound requests from the server's HTTP client go through
 [`openlex_mcp/net.py`](../src/openlex_mcp/net.py), which enforces, before every
 request **and every redirect hop**:
 
-1. **HTTPS only** — non-`https://` schemes are rejected (SEC-004).
+1. **HTTPS by default** — `https://` is required; `http://` is permitted only
+   for hosts in `HTTP_ALLOWED_HOSTS` (today: `www.zhlex.zh.ch`, whose legacy
+   permalink service has no HTTPS endpoint). All other hosts reject non-HTTPS
+   (SEC-004). HTTP→HTTPS redirects re-run the full gate on every hop.
 2. **Host allow-list** — the host must be in `EGRESS_ALLOWLIST`
-   (a `frozenset`, not runtime-mutable). Today: `www.zh.ch`.
+   (a `frozenset`, not runtime-mutable). Today: `www.zh.ch`, `www.zhlex.zh.ch`.
 3. **SSRF IP block** — the host is resolved once and every resulting IP is
    checked against private / loopback / link-local / carrier-grade-NAT ranges
    and the cloud metadata address `169.254.169.254` (SEC-004).

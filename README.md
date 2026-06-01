@@ -333,9 +333,9 @@ clients receive `structuredContent` they can parse directly:
 | **Personal data** | No personal data — all sources are aggregated, public legal texts |
 | **Rate limits** | Built-in per-query caps (max 50 search results, 5000 chars content preview) |
 | **Timeout** | 30 seconds per HTTP call to zh.ch |
-| **Egress** | Outbound requests are HTTPS-only and restricted to an allow-list (`www.zh.ch`), with SSRF IP-blocking and DNS-pinning — see [docs/network-egress.md](docs/network-egress.md) |
+| **Egress** | Outbound requests are restricted to an allow-list (`www.zh.ch` over HTTPS, plus the HTTP-only legacy permalink host `www.zhlex.zh.ch`), with SSRF IP-blocking and DNS-pinning — see [docs/network-egress.md](docs/network-egress.md) |
 | **Authentication** | No API keys required — HuggingFace dataset is public, zh.ch is open |
-| **Security posture (Lethal Trifecta)** | Score **1 / 3**: public data only (no private/sensitive data) ✓ · GET-only egress to `www.zh.ch` — no POST, no webhooks, no email ✓ · no code execution ✓. Structurally safe by design. |
+| **Security posture (Lethal Trifecta)** | Score **1 / 3**: public data only (no private/sensitive data) ✓ · GET-only egress to `*.zh.ch` — no POST, no webhooks, no email ✓ · no code execution ✓. Structurally safe by design. |
 | **Session handling** | `Mcp-Session-Id` generated and managed by the MCP SDK (cryptographically secure UUIDs). No user-identity binding — `auth_model=none` is correct for public read-only data. If authentication is ever added, bind sessions to the validated OAuth `sub` claim before deployment. |
 | **Secrets** | No secrets held — all data sources are public. See [docs/secret-management.md](docs/secret-management.md). |
 | **Licenses** | Law data: CC-BY-SA 4.0 ([rcds/swiss_legislation](https://huggingface.co/datasets/rcds/swiss_legislation)); zh.ch metadata: public |

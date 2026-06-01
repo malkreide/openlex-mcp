@@ -108,8 +108,13 @@ async def test_live_list_laws(live_server):
     resp = await srv.zhlaw_list_laws(srv.ListLawsInput(active_only=True, limit=50))
     assert resp.result_type == "law_summaries"
     assert resp.count >= 50
-    sr_numbers = {r.sr_number for r in resp.results}
-    assert any(sr and sr.startswith("4") for sr in sr_numbers)
+    # list_laws sortiert nach Ordnungsnummer (sr_number) aufsteigend. Die ersten
+    # 50 Gesetze liegen daher im niedrigen Nummernbereich — ein konkretes Prefix
+    # (z.B. "4") ist nicht garantiert. Geprüft wird die tatsächliche Invariante:
+    # es gibt Gesetze mit Ordnungsnummer, und sie kommen aufsteigend sortiert.
+    sr_numbers = [r.sr_number for r in resp.results if r.sr_number]
+    assert sr_numbers, "Expected at least one law with an sr_number"
+    assert sr_numbers == sorted(sr_numbers), "Laws must be sorted by sr_number"
 
 
 # ---------------------------------------------------------------------------
