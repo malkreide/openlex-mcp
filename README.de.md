@@ -20,14 +20,14 @@
 
 ## Übersicht
 
-`openlex-mcp` ermöglicht KI-Assistenten den direkten Zugang zur gesamten Rechtssammlung des Kantons Zürich. Der Server kombiniert Volltextdaten von HuggingFace mit Live-Metadaten der offiziellen zh.ch-Website und speichert alles in einer lokalen SQLite-Datenbank mit FTS5-Volltextindex für Suchzeiten unter 50ms.
+`openlex-mcp` ermöglicht KI-Assistenten den direkten Zugang zur gesamten Rechtssammlung des Kantons Zürich (Zürcher Gesetzessammlung). Der Server kombiniert Volltextdaten von HuggingFace mit Live-Metadaten der offiziellen zh.ch-Website und speichert alles in einer lokalen SQLite-Datenbank mit FTS5-Volltextindex für Suchzeiten unter 50ms.
 
 | Quelle | Daten | Zugriff |
 |--------|-------|---------|
 | **HuggingFace** | 974 ZH-Gesetze — Volltext (PDF-Extrakte) | Lokal als SQLite + FTS5 gecacht |
 | **zh.ch ZH-Lex** | Aktuelle Metadaten, PDF-Links, Gültigkeitsstatus | Live HTTP-Anfragen |
 
-Entwickelt für das Schulamt der Stadt Zürich, aber deckt alle kantonalen Rechtsgebiete ab — von Steuerrecht bis Bauvorschriften.
+Entwickelt für das Schulamt der Stadt Zürich, deckt aber alle kantonalen Rechtsgebiete ab — von Steuerrecht bis Bauvorschriften.
 
 **Anker-Demo-Abfrage:** *«Was sagt das Volksschulgesetz über Elternmitwirkung? Zeige Art. 55 VSG und finde alle Artikel, die ‹Elternrat› erwähnen.»*
 
@@ -43,6 +43,12 @@ Entwickelt für das Schulamt der Stadt Zürich, aber deckt alle kantonalen Recht
 - 💾 **Hybrid-Architektur** — gecachter Volltext (HuggingFace) + Live-Metadaten (zh.ch)
 - 🔓 **Kein API-Schlüssel erforderlich** — alle Daten unter offenen Lizenzen (CC-BY-SA 4.0)
 - ☁️ **Dualer Transport** — stdio (Claude Desktop) + Streamable HTTP (Cloud)
+
+---
+
+## Entwicklungsphase
+
+**Aktuelle Phase: Phase 1 — nur lesend.** Alle Tools sind nur lesend (`readOnlyHint: true`); keine Schreibzugriffe auf externe Systeme. Siehe [ROADMAP.md](ROADMAP.md) für den Phasenplan und die Übergangskriterien, bevor Schreib- oder Multi-Agent-Funktionen hinzugefügt werden.
 
 ---
 
@@ -75,9 +81,20 @@ uv pip install -e .
 # stdio (für Claude Desktop)
 python -m openlex_mcp.server
 
-# Streamable HTTP (Port 8000)
+# Streamable HTTP — bindet standardmässig an 127.0.0.1:8000 (nur localhost)
 python -m openlex_mcp.server --http --port 8000
 ```
+
+### Netzwerk-Binding
+
+Standardmässig bindet der HTTP-Transport an **`127.0.0.1`** (nur localhost). Host
+und Port sind über die Umgebungsvariablen `MCP_HOST` / `MCP_PORT` konfigurierbar
+(oder über die CLI-Flags `--host` / `--port`, die Vorrang haben).
+
+Binde **niemals** ausserhalb eines Containers an `0.0.0.0` — das macht den Server
+im lokalen Netzwerk erreichbar (NeighborJack-Risiko). Für Container-/Cloud-Deployments
+setze `MCP_HOST=0.0.0.0` explizit; geschieht das ausserhalb eines erkannten
+Containers, protokolliert der Server eine Warnung.
 
 Sofort in Claude Desktop ausprobieren:
 
@@ -129,7 +146,13 @@ Für den Einsatz via **claude.ai im Browser** (z.B. auf verwalteten Arbeitsplät
 1. Repository auf GitHub pushen/forken
 2. Auf [render.com](https://render.com): New Web Service → GitHub-Repo verbinden
 3. Start-Befehl setzen: `python -m openlex_mcp.server --http --port 8000`
-4. In claude.ai unter Settings → MCP Servers eintragen: `https://your-app.onrender.com/sse`
+4. Umgebungsvariable `MCP_HOST=0.0.0.0` setzen, damit der Container erreichbar ist
+   (der Code-Default ist `127.0.0.1`; Render setzt die Variable `RENDER`, daher
+   wird keine NeighborJack-Warnung protokolliert)
+5. `MCP_CORS_ORIGINS=https://claude.ai` setzen, damit der Browser den Header
+   `Mcp-Session-Id` lesen kann (kommaseparierte Liste; **kein Wildcard** — Default
+   ist leer, also kein Cross-Origin-Zugriff)
+6. In claude.ai unter Settings → MCP Servers eintragen: `https://your-app.onrender.com/sse`
 
 > 💡 *«stdio für den Entwickler-Laptop, SSE für den Browser.»*
 
@@ -208,6 +231,39 @@ Für den Einsatz via **claude.ai im Browser** (z.B. auf verwalteten Arbeitsplät
 | zh.ch ZH-Lex | HTTP/HTML | Aktuelle Metadaten, PDFs | Keine | Öffentlich |
 | LexFind.ch | HTTP | Interkantonale Links | Keine | Öffentlich |
 
+### Designentscheidung: Nur Tools (keine MCP Resources)
+
+Alle 8 Endpunkte werden als **Tools** statt als MCP Resources bereitgestellt. Begründung:
+
+- Jeder Abruf ist **parametrisch** — Abfragen, Abkürzungen und Artikelnummern variieren pro Aufruf. Statische Resources (eine URI pro Dokument) bilden das nicht natürlich ab.
+- Der Korpus umfasst **974 Gesetze × viele Artikel** — jede einzeln als Resource-URI zu registrieren würde eine unpraktikabel grosse Resource-Liste erzeugen.
+- MCP-Resource-Templates (`zhlex://laws/{sr_number}`) sind eine künftige Option für Phase 2, falls Clients von Resource-Caching oder Subscriptions profitieren.
+
+### Skalierungs-Einschränkungen
+
+Der Streamable-HTTP-Transport hält den Session-State **prozessintern** (FastMCP-Default). Das hat zwei Konsequenzen:
+
+- **Nur eine Instanz** — horizontale Skalierung (mehrere Replicas) bricht aktive Sessions, da es keinen geteilten Session-Store (Redis, Durable Objects etc.) gibt.
+- **Kein Sticky-Session-LB nötig (heute)** — ein Single-Replica-Render-Deployment leitet alle Anfragen naturgemäss an einen Prozess.
+
+Vor der Skalierung über eine Instanz hinaus: entweder einen geteilten Session-Store ergänzen **oder** den Edge-Load-Balancer so konfigurieren, dass er anhand des Headers `Mcp-Session-Id` mit einer Stick-Table und passender TTL routet.
+
+---
+
+## MCP-Protokollversion
+
+| Element | Wert |
+|---------|------|
+| **Unterstützte Protokollversion** | `2025-11-25` |
+| **SDK** | `mcp[cli] >= 1.3.0` (FastMCP) |
+| **Verankert in** | `src/openlex_mcp/server.py` — Konstante `MCP_PROTOCOL_VERSION` |
+
+### Update-Politik
+
+1. Wird `mcp` aktualisiert (via Dependabot-PR), die Protokollversion in den SDK-Release-Notes prüfen.
+2. Ändert sich die Protokollversion, `MCP_PROTOCOL_VERSION` in `server.py` aktualisieren, `docs/tool-hashes.json` neu generieren (`PYTHONPATH=src python scripts/gen_tool_hashes.py > docs/tool-hashes.json`) und die Änderung in `CHANGELOG.md` vermerken.
+3. Vor dem Merge `pytest tests/ -m "not live"` ausführen, um die Kompatibilität zu bestätigen.
+
 ---
 
 ## Projektstruktur
@@ -217,20 +273,46 @@ openlex-mcp/
 ├── src/openlex_mcp/
 │   ├── __init__.py              # Package
 │   ├── __main__.py              # Einstiegspunkt für python -m
-│   ├── server.py                # 8 MCP Tool-Definitionen (FastMCP)
+│   ├── server.py                # 8 MCP Tool-Definitionen (FastMCP) + Settings
+│   ├── responses.py             # Typisierte strukturierte Response-Envelopes (SDK-002)
+│   ├── logging_config.py        # structlog JSON-Logging-Setup (OBS-003)
+│   ├── net.py                   # SSRF-/Egress-gehärteter ausgehender HTTP
 │   ├── api_client.py            # zh.ch HTTP-Client + Metadaten-Extraktion
 │   ├── data_cache.py            # SQLite + FTS5 Cache-Management
 │   └── law_parser.py            # Artikelextraktion aus Gesetzestexten
-├── tests/
-│   └── test_server.py           # Unit + Integrationstests
+├── tests/                       # 89 Unit-Tests (Parser, Cache, Net, Tools…)
+├── scripts/gen_tool_hashes.py   # Hash-Snapshot der Tool-Definitionen (SEC-022)
+├── docs/                        # network-egress, secret-management, tool-hashes
 ├── .github/workflows/ci.yml     # GitHub Actions (Python 3.11/3.12/3.13)
+├── .github/dependabot.yml       # Wöchentliche Dependency-PRs (ARCH-012)
+├── Dockerfile                   # Gehärteter Multi-Stage-Build (SEC-007/SCALE-004)
+├── compose.yml                  # Ressourcenlimits für lokale Tests (SCALE-006)
 ├── pyproject.toml
 ├── claude_desktop_config.json   # Beispiel-Konfiguration für Claude Desktop
 ├── CHANGELOG.md
-├── CONTRIBUTING.md
+├── ROADMAP.md                   # Phasenplan + Register akzeptierter Risiken
+├── CONTRIBUTING.md              # Beitragsleitfaden (Englisch)
+├── CONTRIBUTING.de.md           # Beitragsleitfaden (Deutsch)
+├── SECURITY.md                  # Sicherheitsrichtlinie (Englisch)
+├── SECURITY.de.md               # Sicherheitsrichtlinie (Deutsch)
 ├── LICENSE
 ├── README.md                    # Englische Hauptversion
 └── README.de.md                 # Diese Datei (Deutsch)
+```
+
+### Tool-Ausgabeformat
+
+Alle Tools liefern ein **strukturiertes Response-Envelope** (kein Markdown-Text), sodass MCP-Clients `structuredContent` erhalten, das sie direkt parsen können:
+
+```jsonc
+{
+  "source": "Kanton Zürich Rechtssammlung — HuggingFace … & zh.ch",
+  "provenance": "cache",          // cache | live | parser | cache+parser | none
+  "result_type": "law_summaries", // law_summaries | law_detail | articles | metadata | cache_status
+  "count": 2,
+  "message": null,                // menschenlesbarer Hinweis für leere/Randfälle
+  "results": [ /* typisierte Items */ ]
+}
 ```
 
 ---
@@ -253,10 +335,16 @@ openlex-mcp/
 | **Personendaten** | Keine Personendaten — alle Quellen sind aggregierte, öffentliche Gesetzestexte |
 | **Rate Limits** | Eingebaute Limits pro Abfrage (max. 50 Suchergebnisse, 5000 Zeichen Inhaltsvorschau) |
 | **Timeout** | 30 Sekunden pro HTTP-Aufruf an zh.ch |
+| **Egress** | Ausgehende Anfragen sind auf eine Allow-List beschränkt (`www.zh.ch` über HTTPS, plus der nur per HTTP erreichbare Legacy-Permalink-Host `www.zhlex.zh.ch`), mit SSRF-IP-Sperre und DNS-Pinning — siehe [docs/network-egress.md](docs/network-egress.md) |
 | **Authentifizierung** | Kein API-Schlüssel erforderlich — HuggingFace-Datensatz ist öffentlich, zh.ch ist offen |
+| **Sicherheitsprofil (Lethal Trifecta)** | Score **1 / 3**: nur öffentliche Daten (keine privaten/sensiblen Daten) ✓ · ausschliesslich GET-Egress zu `*.zh.ch` — kein POST, keine Webhooks, keine E-Mail ✓ · keine Codeausführung ✓. Konstruktionsbedingt sicher. |
+| **Session-Handling** | `Mcp-Session-Id` wird vom MCP-SDK generiert und verwaltet (kryptografisch sichere UUIDs). Keine Bindung an eine Benutzeridentität — `auth_model=none` ist für öffentliche, nur lesbare Daten korrekt. Falls jemals eine Authentifizierung hinzukommt, Sessions vor dem Deployment an den validierten OAuth-`sub`-Claim binden. |
+| **Geheimnisse** | Keine gehalten — alle Datenquellen sind öffentlich. Siehe [docs/secret-management.md](docs/secret-management.md). |
 | **Lizenzen** | Gesetzesdaten: CC-BY-SA 4.0 ([rcds/swiss_legislation](https://huggingface.co/datasets/rcds/swiss_legislation)); zh.ch-Metadaten: öffentlich |
 | **Nutzungsbedingungen** | Unterliegt den Nutzungsbedingungen von [HuggingFace](https://huggingface.co/terms-of-service) und [Kanton Zürich](https://www.zh.ch/de/rechtliche-hinweise.html) |
 | **Haftungsausschluss** | Dieser Server stellt Gesetzestexte ausschliesslich zu Informationszwecken bereit — er ersetzt keine Rechtsberatung |
+
+Um eine Sicherheitslücke zu melden, siehe die [Sicherheitsrichtlinie](SECURITY.de.md).
 
 ---
 
@@ -278,9 +366,21 @@ Siehe [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
+## Roadmap
+
+Siehe [ROADMAP.md](ROADMAP.md)
+
+---
+
 ## Mitwirken
 
-Siehe [CONTRIBUTING.md](CONTRIBUTING.md)
+Siehe [CONTRIBUTING.de.md](CONTRIBUTING.de.md)
+
+---
+
+## Sicherheit
+
+Siehe [SECURITY.de.md](SECURITY.de.md)
 
 ---
 

@@ -291,7 +291,10 @@ openlex-mcp/
 ├── claude_desktop_config.json   # Example config for Claude Desktop
 ├── CHANGELOG.md
 ├── ROADMAP.md                   # Phase plan + accepted-risk register
-├── CONTRIBUTING.md
+├── CONTRIBUTING.md              # Contribution guide (English)
+├── CONTRIBUTING.de.md           # Contribution guide (German)
+├── SECURITY.md                  # Security policy (English)
+├── SECURITY.de.md               # Security policy (German)
 ├── LICENSE
 ├── README.md                    # This file (English)
 └── README.de.md                 # German version
@@ -342,6 +345,8 @@ clients receive `structuredContent` they can parse directly:
 | **Terms of Service** | Subject to ToS of [HuggingFace](https://huggingface.co/terms-of-service) and [Canton Zurich](https://www.zh.ch/de/rechtliche-hinweise.html) |
 | **Disclaimer** | This server provides legal texts for informational purposes only — it does not constitute legal advice |
 
+To report a vulnerability, see the [Security Policy](SECURITY.md).
+
 ---
 
 ## Testing
@@ -371,6 +376,12 @@ See [ROADMAP.md](ROADMAP.md)
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md)
+
+---
+
+## Security
+
+See [SECURITY.md](SECURITY.md)
 
 ---
 

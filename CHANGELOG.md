@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Security policy** — `SECURITY.md` (English) and `SECURITY.de.md` (German),
+  linked from both READMEs and `CONTRIBUTING.md`.
+- **German contribution guide** — `CONTRIBUTING.de.md`, linked from
+  `CONTRIBUTING.md`.
+
 ### Fixed
 - **Live tests** — repaired three nightly live-test regressions caused by upstream
   drift:
@@ -30,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   HTTPS remains mandatory for every other host; the allow-list, SSRF IP-block,
   DNS-pinning, and per-hop redirect gate are unchanged. See
   `docs/network-egress.md`.
+- **Documentation consistency** — re-synced `README.de.md` with the English
+  `README.md` (Development Phase, network binding, expanded cloud config, design
+  decision, scaling constraints, MCP protocol version, tool output format,
+  security rows, updated project tree). Updated `LICENSE` copyright year to 2026.
 
 ## [v0.2.0] — 2026-05-29
 
