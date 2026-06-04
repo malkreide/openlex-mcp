@@ -1,5 +1,7 @@
 # Contributing to openlex-mcp
 
+[🇩🇪 Deutsche Version](CONTRIBUTING.de.md)
+
 Thank you for your interest in contributing! This server is part of the [Swiss Public Data MCP Portfolio](https://github.com/malkreide).
 
 ---
@@ -12,6 +14,8 @@ Please include:
 - Python version and OS
 - Full error message or description of unexpected behaviour
 - Steps to reproduce
+
+For **security vulnerabilities**, please follow the [Security Policy](SECURITY.md) instead of opening a public issue.
 
 ---
 
