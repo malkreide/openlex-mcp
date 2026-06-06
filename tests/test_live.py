@@ -9,6 +9,7 @@ Deckt alle 8 MCP-Tools ab. Requires real network access:
 """
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -156,15 +157,42 @@ async def test_live_search_articles(live_server):
 # Tool 7 — zhlaw_get_law_metadata  (live HTTP to zh.ch)
 # ---------------------------------------------------------------------------
 
+# Errors that signal zh.ch is transiently unreachable rather than a code
+# regression — the tool itself handled them correctly by returning found=False
+# with a clear message (see fetch_zhlex_metadata). On these we retry and, if
+# they persist, skip so a flaky nightly network doesn't redden the build.
+_TRANSIENT_METADATA_ERRORS = ("Timeout bei zh.ch", "Verbindung", "Egress blockiert")
+
+
+def _is_transient(item) -> bool:
+    return bool(item.error) and any(
+        marker in item.error for marker in _TRANSIENT_METADATA_ERRORS
+    )
+
 
 @pytest.mark.live
 async def test_live_get_law_metadata(live_server, _http_client):
-    resp = await srv.zhlaw_get_law_metadata(
-        srv.GetLawMetadataInput(sr_number="412.100")
-    )
-    assert resp.result_type == "metadata"
-    assert resp.count == 1
-    item = resp.results[0]
+    # zh.ch is an external service; transient timeouts are not code regressions.
+    # Retry a few times with exponential backoff, then skip (not fail) if it
+    # stays unreachable. Non-transient failures fall through to the assertions
+    # below and fail loudly.
+    item = None
+    for attempt in range(3):
+        resp = await srv.zhlaw_get_law_metadata(
+            srv.GetLawMetadataInput(sr_number="412.100")
+        )
+        assert resp.result_type == "metadata"
+        assert resp.count == 1
+        item = resp.results[0]
+        if item.found or not _is_transient(item):
+            break
+        if attempt < 2:
+            await asyncio.sleep(2 ** attempt)
+
+    if item is not None and not item.found and _is_transient(item):
+        pytest.skip(f"zh.ch transiently unreachable: {item.error}")
+
+    assert item is not None
     assert item.sr_number == "412.100"
     assert item.found is True, f"Expected found=True, got error: {item.error}"
     assert item.page_title is not None, "Expected page_title from zh.ch"
