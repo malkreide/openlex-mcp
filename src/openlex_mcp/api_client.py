@@ -14,6 +14,7 @@ aus den HTML-Seiten extrahiert (Web Scraping light).
 
 from __future__ import annotations
 
+import asyncio
 import re
 
 import httpx
@@ -34,6 +35,13 @@ LEXFIND_BASE = "https://www.lexfind.ch"
 REQUEST_TIMEOUT = 30.0
 # HTTP-Header müssen ASCII sein (httpx lehnt Umlaute ab) — daher "Zuerich".
 USER_AGENT = "openlex-mcp/0.2.0 (Kanton Zuerich Rechtssammlung MCP Server)"
+
+# Transiente Netzfehler (Timeout/Verbindung) gegen zh.ch werden mit
+# exponentiellem Backoff erneut versucht — der Dienst ist zeitweise langsam
+# oder kurz nicht erreichbar. Deterministische Fehler (404, HTTP-Status,
+# Egress-Block) werden NICHT wiederholt.
+METADATA_MAX_ATTEMPTS = 3
+METADATA_BACKOFF_BASE = 1.0  # Sekunden → Wartezeiten 1 s, 2 s zwischen Versuchen
 
 # ZH-Lex URL-Muster für Ordnungsnummern
 # Konvertierung: 412.100 → 412_100
@@ -151,54 +159,72 @@ async def fetch_zhlex_metadata(sr_number: str) -> dict:
     # net.safe_get erzwingt HTTPS (HTTP nur für gelistete Hosts) + Egress-Allow-
     # List + SSRF-IP-Block + DNS-Pinning.
     client = get_client()
-    try:
-        response, final_url = await net.safe_get(client, url)
 
-        if response.status_code == 404:
+    # Transiente Fehler lösen einen erneuten Versuch aus; der zuletzt gesehene
+    # bestimmt die Fehlermeldung, falls alle Versuche scheitern.
+    last_transient: httpx.HTTPError | None = None
+    for attempt in range(METADATA_MAX_ATTEMPTS):
+        try:
+            response, final_url = await net.safe_get(client, url)
+
+            if response.status_code == 404:
+                return {
+                    "found": False,
+                    "sr_number": sr_number,
+                    "url": final_url,
+                    "message": f"Gesetz {sr_number} nicht auf zh.ch gefunden.",
+                }
+
+            response.raise_for_status()
+            html = response.text
+
+            # Basis-Metadaten aus HTML extrahieren
+            metadata = _extract_metadata_from_html(html, sr_number)
+            metadata["url"] = final_url
+            metadata["found"] = True
+            return metadata
+
+        except (httpx.TimeoutException, httpx.ConnectError) as e:
+            # Transient: erneut versuchen, ausser dies war der letzte Versuch.
+            last_transient = e
+            if attempt < METADATA_MAX_ATTEMPTS - 1:
+                await asyncio.sleep(METADATA_BACKOFF_BASE * 2**attempt)
+                continue
+            break
+        except net.EgressError as e:
             return {
                 "found": False,
                 "sr_number": sr_number,
-                "url": final_url,
-                "message": f"Gesetz {sr_number} nicht auf zh.ch gefunden.",
+                "url": url,
+                "error": f"Egress blockiert: {e}",
+            }
+        except httpx.HTTPStatusError as e:
+            return {
+                "found": False,
+                "sr_number": sr_number,
+                "url": url,
+                "error": f"HTTP {e.response.status_code}",
+            }
+        except Exception as e:
+            return {
+                "found": False,
+                "sr_number": sr_number,
+                "url": url,
+                "error": str(e),
             }
 
-        response.raise_for_status()
-        html = response.text
-
-        # Basis-Metadaten aus HTML extrahieren
-        metadata = _extract_metadata_from_html(html, sr_number)
-        metadata["url"] = final_url
-        metadata["found"] = True
-        return metadata
-
-    except net.EgressError as e:
-        return {
-            "found": False,
-            "sr_number": sr_number,
-            "url": url,
-            "error": f"Egress blockiert: {e}",
-        }
-    except httpx.HTTPStatusError as e:
-        return {
-            "found": False,
-            "sr_number": sr_number,
-            "url": url,
-            "error": f"HTTP {e.response.status_code}",
-        }
-    except httpx.TimeoutException:
-        return {
-            "found": False,
-            "sr_number": sr_number,
-            "url": url,
-            "error": "Timeout bei zh.ch",
-        }
-    except Exception as e:
-        return {
-            "found": False,
-            "sr_number": sr_number,
-            "url": url,
-            "error": str(e),
-        }
+    # Alle Versuche an transienten Netzfehlern gescheitert.
+    error = (
+        "Timeout bei zh.ch"
+        if isinstance(last_transient, httpx.TimeoutException)
+        else "Verbindung zu zh.ch fehlgeschlagen"
+    )
+    return {
+        "found": False,
+        "sr_number": sr_number,
+        "url": url,
+        "error": error,
+    }
 
 
 def _extract_metadata_from_html(html: str, sr_number: str) -> dict:

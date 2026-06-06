@@ -98,6 +98,65 @@ async def test_fetch_zhlex_metadata_404_returns_not_found(monkeypatch):
     assert meta["sr_number"] == "000.0"
 
 
+async def _no_sleep(_seconds: float) -> None:
+    """Stub für asyncio.sleep — Backoff ohne reale Wartezeit im Test."""
+
+
+@pytest.mark.asyncio
+async def test_fetch_zhlex_metadata_retries_transient_then_succeeds(monkeypatch):
+    # Erster Versuch: transienter Timeout → Retry; zweiter Versuch: Erfolg.
+    calls = {"n": 0}
+
+    async def fake_safe_get(_client, url, **_kw):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise httpx.ConnectTimeout("slow")
+        return httpx.Response(200, html="<title>Volksschulgesetz</title>"), url
+
+    monkeypatch.setattr(api_client.net, "safe_get", fake_safe_get)
+    monkeypatch.setattr(api_client.asyncio, "sleep", _no_sleep)
+
+    meta = await api_client.fetch_zhlex_metadata("412.100")
+    assert calls["n"] == 2
+    assert meta["found"] is True
+    assert meta["page_title"] == "Volksschulgesetz"
+
+
+@pytest.mark.asyncio
+async def test_fetch_zhlex_metadata_exhausts_retries_on_timeout(monkeypatch):
+    # Persistenter Timeout: alle Versuche scheitern → found=False, klare Meldung.
+    calls = {"n": 0}
+
+    async def fake_safe_get(_client, _url, **_kw):
+        calls["n"] += 1
+        raise httpx.ReadTimeout("slow")
+
+    monkeypatch.setattr(api_client.net, "safe_get", fake_safe_get)
+    monkeypatch.setattr(api_client.asyncio, "sleep", _no_sleep)
+
+    meta = await api_client.fetch_zhlex_metadata("412.100")
+    assert calls["n"] == api_client.METADATA_MAX_ATTEMPTS
+    assert meta["found"] is False
+    assert meta["error"] == "Timeout bei zh.ch"
+
+
+@pytest.mark.asyncio
+async def test_fetch_zhlex_metadata_does_not_retry_404(monkeypatch):
+    # 404 ist deterministisch → genau ein Versuch, kein Retry.
+    calls = {"n": 0}
+
+    async def fake_safe_get(_client, url, **_kw):
+        calls["n"] += 1
+        return httpx.Response(404), url
+
+    monkeypatch.setattr(api_client.net, "safe_get", fake_safe_get)
+    monkeypatch.setattr(api_client.asyncio, "sleep", _no_sleep)
+
+    meta = await api_client.fetch_zhlex_metadata("000.0")
+    assert calls["n"] == 1
+    assert meta["found"] is False
+
+
 @pytest.mark.asyncio
 async def test_fetch_blocked_when_host_resolves_to_metadata_ip(monkeypatch):
     # SEC-004: even the fixed host is refused if it resolves to a blocked IP.
