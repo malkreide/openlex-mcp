@@ -111,7 +111,15 @@ async def test_fetch_zhlex_metadata_retries_transient_then_succeeds(monkeypatch)
         calls["n"] += 1
         if calls["n"] == 1:
             raise httpx.ConnectTimeout("slow")
-        return httpx.Response(200, html="<title>Volksschulgesetz</title>"), url
+        # request anhängen, sonst wirft Response.raise_for_status() RuntimeError.
+        return (
+            httpx.Response(
+                200,
+                html="<title>Volksschulgesetz</title>",
+                request=httpx.Request("GET", url),
+            ),
+            url,
+        )
 
     monkeypatch.setattr(api_client.net, "safe_get", fake_safe_get)
     monkeypatch.setattr(api_client.asyncio, "sleep", _no_sleep)
