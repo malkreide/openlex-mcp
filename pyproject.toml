@@ -48,6 +48,7 @@ dev = [
 openlex-mcp = "openlex_mcp.server:main"
 
 [project.urls]
+"mcp-name" = "io.github.malkreide/openlex-mcp"
 Homepage   = "https://github.com/malkreide/openlex-mcp"
 Repository = "https://github.com/malkreide/openlex-mcp"
 Issues     = "https://github.com/malkreide/openlex-mcp/issues"
