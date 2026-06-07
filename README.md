@@ -406,3 +406,5 @@ Hayal Oezkan · [malkreide](https://github.com/malkreide)
 - **Related:** [swiss-courts-mcp](https://github.com/malkreide/swiss-courts-mcp) — Law text + case law = complete legal research
 - **Related:** [zurich-opendata-mcp](https://github.com/malkreide/zurich-opendata-mcp) — Law text + city council decisions = full context
 - **Portfolio:** [Swiss Public Data MCP Portfolio](https://github.com/malkreide)
+
+<!-- mcp-name: io.github.malkreide/openlex-mcp -->
