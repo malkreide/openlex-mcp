@@ -408,3 +408,22 @@ Hayal Oezkan · [malkreide](https://github.com/malkreide)
 - **Portfolio:** [Swiss Public Data MCP Portfolio](https://github.com/malkreide)
 
 <!-- mcp-name: io.github.malkreide/openlex-mcp -->
+
+<!-- BEGIN GENERATED: install -->
+## Installation
+
+Run via [`uv`](https://docs.astral.sh/uv/)'s `uvx` — no clone or manual install needed. Add to your MCP client config (`mcpServers` for Claude Desktop, Cursor and Windsurf; use a top-level `servers` key for VS Code in `.vscode/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "openlex-mcp": {
+      "command": "uvx",
+      "args": [
+        "openlex-mcp"
+      ]
+    }
+  }
+}
+```
+<!-- END GENERATED: install -->
