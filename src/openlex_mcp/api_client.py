@@ -26,10 +26,14 @@ from openlex_mcp import net
 # ---------------------------------------------------------------------------
 
 ZHLEX_BASE = "https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessammlung"
-# Legacy-Permalink-Dienst: stabile URL pro Ordnungsnummer (nur HTTP). Leitet
-# auf die aktuelle Fassung unter www.zh.ch weiter. Wird für den Live-Abruf
-# verwendet, weil www.zh.ch keine undatierte Erlass-URL mehr bereitstellt.
-ZHLEX_PERMALINK_BASE = "http://www.zhlex.zh.ch/Erlass.html"
+# Permalink-Dienst: stabile URL pro Ordnungsnummer. 'lawcollection-directlink'
+# leitet (302) auf die aktuelle datierte Fassung unter www.zh.ch weiter — nötig,
+# weil www.zh.ch keine undatierte Erlass-URL bereitstellt. Löst den früheren
+# Permalink http://www.zhlex.zh.ch/Erlass.html ab, der von zh.ch umgestellt
+# wurde und nun 404 liefert.
+ZHLEX_PERMALINK_BASE = (
+    "https://www.zhlex.zh.ch/bin/zhweb/publish/lawcollection-directlink"
+)
 LEXFIND_BASE = "https://www.lexfind.ch"
 
 REQUEST_TIMEOUT = 30.0

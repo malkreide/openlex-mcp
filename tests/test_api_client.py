@@ -16,7 +16,10 @@ def test_build_zhlex_search_url_converts_dot_to_underscore():
 
 def test_build_zhlex_permalink_url_uses_ordnungsnummer():
     url = api_client.build_zhlex_permalink_url("412.100")
-    assert url == "http://www.zhlex.zh.ch/Erlass.html?Open&Ordnr=412.100"
+    assert url == (
+        "https://www.zhlex.zh.ch/bin/zhweb/publish/"
+        "lawcollection-directlink?Open&Ordnr=412.100"
+    )
 
 
 def test_build_lexfind_url_contains_query_and_canton():

@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CONTRIBUTING.md`.
 
 ### Fixed
+- **`zhlaw_get_law_metadata` permalink** — the legacy
+  `http://www.zhlex.zh.ch/Erlass.html?Open&Ordnr=<ordnr>` permalink was replaced
+  upstream and now returns 404 (it redirected to a `lawcollection-directlink`
+  endpoint that 404s over HTTP). Metadata now resolves via the current
+  `https://www.zhlex.zh.ch/bin/zhweb/publish/lawcollection-directlink?Open&Ordnr=<ordnr>`
+  endpoint, which 302-redirects to the consolidated version on `www.zh.ch`.
 - **Live tests** — repaired three nightly live-test regressions caused by upstream
   drift:
   - `zhlaw_get_article` returned empty `content` for single-line PDF extracts
