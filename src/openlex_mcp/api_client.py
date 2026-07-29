@@ -21,6 +21,8 @@ import httpx
 
 from openlex_mcp import net
 
+from . import __version__
+
 # ---------------------------------------------------------------------------
 # Konstanten
 # ---------------------------------------------------------------------------
@@ -38,7 +40,7 @@ LEXFIND_BASE = "https://www.lexfind.ch"
 
 REQUEST_TIMEOUT = 30.0
 # HTTP-Header müssen ASCII sein (httpx lehnt Umlaute ab) — daher "Zuerich".
-USER_AGENT = "openlex-mcp/0.2.0 (Kanton Zuerich Rechtssammlung MCP Server)"
+USER_AGENT = f"openlex-mcp/{__version__} (Kanton Zuerich Rechtssammlung MCP Server)"
 
 # Transiente Netzfehler (Timeout/Verbindung) gegen zh.ch werden mit
 # exponentiellem Backoff erneut versucht — der Dienst ist zeitweise langsam
