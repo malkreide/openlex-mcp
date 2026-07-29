@@ -26,8 +26,8 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Literal, NoReturn
 
-from mcp.server.fastmcp import Context, FastMCP
-from mcp.server.fastmcp.exceptions import ToolError
+from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -135,7 +135,7 @@ class AppContext:
 
 
 @asynccontextmanager
-async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
+async def app_lifespan(server: MCPServer) -> AsyncIterator[AppContext]:
     """Verwaltet server-weite Ressourcen über den gesamten Lifecycle.
 
     SDK-001: erstellt beim Start einen einzigen, geteilten httpx-Client
@@ -156,7 +156,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 # Server
 # ---------------------------------------------------------------------------
 
-mcp = FastMCP(
+mcp = MCPServer(
     "openlex_mcp",
     instructions=(
         "MCP-Server für die Zürcher Gesetzessammlung (ZH-Lex / Kanton Zürich). "
