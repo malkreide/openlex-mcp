@@ -5,7 +5,7 @@ import logging
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from mcp.server.fastmcp.exceptions import ToolError
+from mcp.server.mcpserver.exceptions import ToolError
 from structlog.testing import capture_logs
 
 import openlex_mcp.server as srv
