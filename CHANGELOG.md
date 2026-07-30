@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **HTTP-Modus wies unter jedem echten Hostnamen mit 421 ab (SEC-005).**
+  `_build_http_app()` rief `mcp.streamable_http_app()` ohne `host` auf. Unter
+  mcp 2.x ist das kein neutraler Default: das SDK leitet daraus eine Allow-List
+  ab und aktiviert bei loopback-artigem Wert automatisch `127.0.0.1:*`. Da der
+  Default `127.0.0.1` ist, galt das auch für den `MCP_HOST=0.0.0.0`-Bind des
+  Containers. Nachgemessen an der echten ASGI-App vor dem Fix:
+
+      Host 127.0.0.1:8000        -> 200
+      Host mcp.example.ch        -> 421
+      Host openlex.example.com   -> 421
+
+  `/healthz` antwortete weiter mit 200 und verdeckte es, weshalb ein
+  Readiness-Probe nichts gemerkt hätte.
+
+  Der Bind reist jetzt in die App, und eine explizite Allow-List wird aus dem
+  neuen `MCP_ALLOWED_HOSTS` gebaut. Ohne diese Variable bleibt der Schutz auf
+  einem Nicht-Loopback-Bind bewusst aus und der Aufrufer warnt — eine geratene
+  Liste würde genau das 421-Problem reproduzieren. Konfigurierte CORS-Origins
+  werden mit aufgenommen, sonst weist der Transport genau die Browser-Clients
+  ab, die CORS erlaubt.
+
+  13 neue Tests, davon der tragende „richtiger Hostname, falscher Port": nur er
+  unterscheidet eine portgenaue Allow-List von einer, die alles durchlässt —
+  `evil.example.com` allein würde auch ein zurückfallender Loopback-Default
+  abweisen. Mutationsgetestet: nimmt man den `host`-Kwarg wieder weg,
+  reproduziert der Test das 421 exakt.
+
+  Geprüft mit dem wörtlichen CI-Kommando: 111 passed, 8 deselected;
+  `ruff check src/ tests/` clean.
+
+
 ### Added
 - **Security policy** — `SECURITY.md` (English) and `SECURITY.de.md` (German),
   linked from both READMEs and `CONTRIBUTING.md`.
