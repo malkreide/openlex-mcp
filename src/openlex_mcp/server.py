@@ -186,6 +186,7 @@ mcp = MCPServer(
 
 class SearchLawsInput(BaseModel):
     """Volltextsuche in allen Zürcher Gesetzen."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     query: str = Field(
         ...,
@@ -220,6 +221,7 @@ class SearchLawsInput(BaseModel):
 
 class GetLawInput(BaseModel):
     """Gesetz nach Ordnungsnummer oder Abkürzung abrufen."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     identifier: str = Field(
         ...,
@@ -240,21 +242,18 @@ class GetLawInput(BaseModel):
 
 class GetArticleInput(BaseModel):
     """Einzelnen Artikel aus einem Gesetz extrahieren."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     law_identifier: str = Field(
         ...,
-        description=(
-            "Ordnungsnummer (z.B. '412.100') ODER Abkürzung (z.B. 'VSG') "
-            "des Gesetzes."
-        ),
+        description=("Ordnungsnummer (z.B. '412.100') ODER Abkürzung (z.B. 'VSG') des Gesetzes."),
         min_length=1,
         max_length=50,
     )
     article_number: str = Field(
         ...,
         description=(
-            "Artikelnummer, z.B. '28', '28a', '28bis'. "
-            "Ohne 'Art.' Prefix — nur die Nummer."
+            "Artikelnummer, z.B. '28', '28a', '28bis'. Ohne 'Art.' Prefix — nur die Nummer."
         ),
         min_length=1,
         max_length=20,
@@ -263,6 +262,7 @@ class GetArticleInput(BaseModel):
 
 class ListLawsInput(BaseModel):
     """Gesetze auflisten mit optionalem Filter."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     active_only: bool = Field(
         default=True,
@@ -291,6 +291,7 @@ class ListLawsInput(BaseModel):
 
 class FindEducationLawsInput(BaseModel):
     """Bildungsrecht-Schnellsuche (LS 412.x Serie)."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     query: str = Field(
         ...,
@@ -307,6 +308,7 @@ class FindEducationLawsInput(BaseModel):
 
 class SearchArticlesInput(BaseModel):
     """Suche innerhalb der Artikel eines bestimmten Gesetzes."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     law_identifier: str = Field(
         ...,
@@ -327,6 +329,7 @@ class SearchArticlesInput(BaseModel):
 
 class GetLawMetadataInput(BaseModel):
     """Aktuelle Metadaten von zh.ch abrufen."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     sr_number: str = Field(
         ...,
@@ -339,6 +342,7 @@ class GetLawMetadataInput(BaseModel):
 
 class UpdateCacheInput(BaseModel):
     """Cache aktualisieren."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
     force: bool = Field(
         default=False,
@@ -413,9 +417,7 @@ def _to_detail(law: dict, include_content: bool = False) -> LawDetail:
     )
 
 
-def _to_article_item(
-    article: Article, law: dict | None = None
-) -> ArticleItem:
+def _to_article_item(article: Article, law: dict | None = None) -> ArticleItem:
     """Konvertiert ein geparstes Article in ein ArticleItem-Modell (SDK-002)."""
     sr = (law or {}).get("sr_number") or None
     return ArticleItem(

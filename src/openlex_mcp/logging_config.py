@@ -4,6 +4,7 @@ JSON-Ausgabe nach **stderr** (stdout bleibt dem JSON-RPC-Stream vorbehalten,
 OBS-004), RFC-5424-kompatible Severity-Stufen (debug/info/warning/error/
 critical) und pro-Tool-Call gebundener Kontext (Tool-Name + Correlation-ID).
 """
+
 from __future__ import annotations
 
 import logging

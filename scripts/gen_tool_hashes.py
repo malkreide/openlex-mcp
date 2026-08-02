@@ -10,6 +10,7 @@ reviewer should request a re-approval of the changed tool definitions.
 
 Hash covers: tool name + description + parameter JSON schema (sorted keys).
 """
+
 import hashlib
 import json
 import sys

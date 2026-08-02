@@ -7,6 +7,7 @@ Deckt alle 8 MCP-Tools ab. Requires real network access:
   - HuggingFace rcds/swiss_legislation (dataset download, ~25 s)
   - www.zh.ch (HTML scraping, 1 HTTP request)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -125,16 +126,12 @@ async def test_live_list_laws(live_server):
 
 @pytest.mark.live
 async def test_live_find_education_laws(live_server):
-    resp = await srv.zhlaw_find_education_laws(
-        srv.FindEducationLawsInput(query="Volksschule")
-    )
+    resp = await srv.zhlaw_find_education_laws(srv.FindEducationLawsInput(query="Volksschule"))
     assert resp.result_type == "law_summaries"
     assert resp.count >= 1
     for law in resp.results:
         if law.sr_number:
-            assert law.sr_number.startswith("412"), (
-                f"Expected 412.x prefix, got {law.sr_number}"
-            )
+            assert law.sr_number.startswith("412"), f"Expected 412.x prefix, got {law.sr_number}"
 
 
 # ---------------------------------------------------------------------------
@@ -165,9 +162,7 @@ _TRANSIENT_METADATA_ERRORS = ("Timeout bei zh.ch", "Verbindung", "Egress blockie
 
 
 def _is_transient(item) -> bool:
-    return bool(item.error) and any(
-        marker in item.error for marker in _TRANSIENT_METADATA_ERRORS
-    )
+    return bool(item.error) and any(marker in item.error for marker in _TRANSIENT_METADATA_ERRORS)
 
 
 @pytest.mark.live
@@ -178,16 +173,14 @@ async def test_live_get_law_metadata(live_server, _http_client):
     # below and fail loudly.
     item = None
     for attempt in range(3):
-        resp = await srv.zhlaw_get_law_metadata(
-            srv.GetLawMetadataInput(sr_number="412.100")
-        )
+        resp = await srv.zhlaw_get_law_metadata(srv.GetLawMetadataInput(sr_number="412.100"))
         assert resp.result_type == "metadata"
         assert resp.count == 1
         item = resp.results[0]
         if item.found or not _is_transient(item):
             break
         if attempt < 2:
-            await asyncio.sleep(2 ** attempt)
+            await asyncio.sleep(2**attempt)
 
     if item is not None and not item.found and _is_transient(item):
         pytest.skip(f"zh.ch transiently unreachable: {item.error}")

@@ -27,20 +27,22 @@ from dataclasses import dataclass, field
 @dataclass
 class Article:
     """Ein einzelner Gesetzesartikel."""
-    number: str          # z.B. "28", "28a", "28bis"
-    title: str = ""      # z.B. "Elternmitwirkung"
-    content: str = ""    # Volltext des Artikels
+
+    number: str  # z.B. "28", "28a", "28bis"
+    title: str = ""  # z.B. "Elternmitwirkung"
+    content: str = ""  # Volltext des Artikels
     paragraphs: list[str] = field(default_factory=list)  # Absätze ¹²³
 
 
 @dataclass
 class ParsedLaw:
     """Ergebnis des Gesetzes-Parsings."""
+
     title: str = ""
     abbreviation: str = ""
     sr_number: str = ""
     articles: list[Article] = field(default_factory=list)
-    preamble: str = ""   # Text vor dem ersten Artikel
+    preamble: str = ""  # Text vor dem ersten Artikel
 
 
 # ---------------------------------------------------------------------------
@@ -54,11 +56,11 @@ class ParsedLaw:
 # bei einzeiligen PDF-Extrakten ohne separate Titelzeile kein Inhalt mehr
 # verloren (der gesamte Fliesstext landet sonst fälschlich im Titel).
 _ARTICLE_PATTERN = re.compile(
-    r"(?:^|\n|\s{2,})"                     # Zeilenanfang oder Einrückung
+    r"(?:^|\n|\s{2,})"  # Zeilenanfang oder Einrückung
     r"\s*"
-    r"(?:Art\.?(?:ikel)?|§)\s*"            # "Art.", "Artikel", "§"
-    r"(\d+[a-z]?(?:bis|ter|quater)?)"      # Nummer: 28, 28a, 28bis
-    r"(?:\.\s*|\s+)",                       # Punkt oder Leerzeichen nach der Nummer
+    r"(?:Art\.?(?:ikel)?|§)\s*"  # "Art.", "Artikel", "§"
+    r"(\d+[a-z]?(?:bis|ter|quater)?)"  # Nummer: 28, 28a, 28bis
+    r"(?:\.\s*|\s+)",  # Punkt oder Leerzeichen nach der Nummer
     re.MULTILINE | re.IGNORECASE,
 )
 
@@ -91,7 +93,7 @@ def _split_title_content(body: str) -> tuple[str, str]:
         return "", body
 
     first = body[:nl].strip()
-    rest = body[nl + 1:].strip()
+    rest = body[nl + 1 :].strip()
 
     if (
         rest
@@ -103,6 +105,7 @@ def _split_title_content(body: str) -> tuple[str, str]:
         return first, rest
 
     return "", body
+
 
 # Absatz-Erkennung: Superscript-Ziffern ¹²³⁴⁵⁶⁷⁸⁹
 _PARAGRAPH_PATTERN = re.compile(
@@ -153,8 +156,18 @@ def clean_text(text: str) -> str:
 
 def _superscript_to_int(s: str) -> int:
     """Konvertiert Superscript-Ziffer zu int: ¹→1, ²→2, etc."""
-    mapping = {"⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4",
-               "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9"}
+    mapping = {
+        "⁰": "0",
+        "¹": "1",
+        "²": "2",
+        "³": "3",
+        "⁴": "4",
+        "⁵": "5",
+        "⁶": "6",
+        "⁷": "7",
+        "⁸": "8",
+        "⁹": "9",
+    }
     return int("".join(mapping.get(c, c) for c in s))
 
 
@@ -217,12 +230,14 @@ def parse_law_text(text: str) -> list[Article]:
                 para_text = nm.group(2).strip()
                 paragraphs.append(f"Abs. {para_num}: {para_text}")
 
-        articles.append(Article(
-            number=number,
-            title=title,
-            content=content,
-            paragraphs=paragraphs,
-        ))
+        articles.append(
+            Article(
+                number=number,
+                title=title,
+                content=content,
+                paragraphs=paragraphs,
+            )
+        )
 
     return articles
 
@@ -261,9 +276,9 @@ def search_in_articles(text: str, query: str) -> list[Article]:
     query_lower = query.lower()
 
     return [
-        article for article in articles
-        if (query_lower in article.content.lower()
-            or query_lower in article.title.lower())
+        article
+        for article in articles
+        if (query_lower in article.content.lower() or query_lower in article.title.lower())
     ]
 
 

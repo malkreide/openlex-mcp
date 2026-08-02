@@ -18,6 +18,7 @@ erneut durchläuft (verhindert Redirect-basiertes SSRF).
 Die Network-Layer-Ergänzung (NetworkPolicy / Security Group) ist in
 `docs/network-egress.md` dokumentiert.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -74,8 +75,7 @@ def assert_host_allowed(host: str) -> None:
     """Wirft EgressError, wenn der Host nicht in der Allow-List steht (SEC-021)."""
     if host not in EGRESS_ALLOWLIST:
         raise EgressError(
-            f"Host '{host}' nicht in der Egress-Allow-List "
-            f"({sorted(EGRESS_ALLOWLIST)})."
+            f"Host '{host}' nicht in der Egress-Allow-List ({sorted(EGRESS_ALLOWLIST)})."
         )
 
 
@@ -107,8 +107,7 @@ async def assert_url_allowed(url: str) -> list[str]:
         pass
     else:
         raise EgressError(
-            f"Schema {parsed.scheme!r} für Host {host!r} nicht erlaubt "
-            "(HTTPS erforderlich)."
+            f"Schema {parsed.scheme!r} für Host {host!r} nicht erlaubt (HTTPS erforderlich)."
         )
     assert_host_allowed(host)
     default_port = 80 if parsed.scheme == "http" else 443
@@ -118,8 +117,7 @@ async def assert_url_allowed(url: str) -> list[str]:
     for ip in ips:
         if _is_blocked_ip(ip):
             raise EgressError(
-                f"Blockierte IP {ip} für '{host}' "
-                f"(privater/loopback/link-local/Metadata-Bereich)."
+                f"Blockierte IP {ip} für '{host}' (privater/loopback/link-local/Metadata-Bereich)."
             )
     return ips
 

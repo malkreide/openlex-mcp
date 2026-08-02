@@ -33,9 +33,7 @@ ZHLEX_BASE = "https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessam
 # weil www.zh.ch keine undatierte Erlass-URL bereitstellt. Löst den früheren
 # Permalink http://www.zhlex.zh.ch/Erlass.html ab, der von zh.ch umgestellt
 # wurde und nun 404 liefert.
-ZHLEX_PERMALINK_BASE = (
-    "https://www.zhlex.zh.ch/bin/zhweb/publish/lawcollection-directlink"
-)
+ZHLEX_PERMALINK_BASE = "https://www.zhlex.zh.ch/bin/zhweb/publish/lawcollection-directlink"
 LEXFIND_BASE = "https://www.lexfind.ch"
 
 REQUEST_TIMEOUT = 30.0

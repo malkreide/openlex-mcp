@@ -6,16 +6,14 @@ Pydantic-Envelope zurück: ``source`` (Provenienz-Text), ``provenance``
 ``results``-Liste. ``message`` trägt optionale, menschenlesbare Hinweise
 (z. B. „nicht gefunden“-Guidance).
 """
+
 from __future__ import annotations
 
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
-SOURCE = (
-    "Kanton Zürich Rechtssammlung — HuggingFace rcds/swiss_legislation "
-    "(CC-BY-SA 4.0) & zh.ch"
-)
+SOURCE = "Kanton Zürich Rechtssammlung — HuggingFace rcds/swiss_legislation (CC-BY-SA 4.0) & zh.ch"
 
 Provenance = Literal["cache", "live", "parser", "cache+parser", "none"]
 

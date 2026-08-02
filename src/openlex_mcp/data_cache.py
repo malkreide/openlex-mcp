@@ -122,11 +122,7 @@ class LawCache:
         """Erstellt Tabellen und FTS-Index."""
         conn = self._get_conn()
         try:
-            conn.executescript(
-                _CREATE_LAWS_TABLE
-                + _CREATE_META_TABLE
-                + _CREATE_INDEXES
-            )
+            conn.executescript(_CREATE_LAWS_TABLE + _CREATE_META_TABLE + _CREATE_INDEXES)
             # FTS separat (VIRTUAL TABLE)
             try:
                 conn.execute(_CREATE_FTS_TABLE)
@@ -159,7 +155,9 @@ class LawCache:
             from datasets import load_dataset
         except ImportError:
             return {
-                "loaded": 0, "total": 0, "duration_s": 0,
+                "loaded": 0,
+                "total": 0,
+                "duration_s": 0,
                 "status": "error",
                 "message": "Das Paket 'datasets' ist nicht installiert. Bitte 'pip install datasets' ausführen.",
             }
@@ -168,15 +166,16 @@ class LawCache:
             ds = load_dataset(HF_DATASET, split=HF_SPLIT)
         except Exception as e:
             return {
-                "loaded": 0, "total": 0, "duration_s": 0,
+                "loaded": 0,
+                "total": 0,
+                "duration_s": 0,
                 "status": "error",
                 "message": f"HuggingFace-Download fehlgeschlagen: {e}",
             }
 
         # Filter: nur Kanton Zürich, Deutsch
         zh_laws = [
-            row for row in ds
-            if row.get("canton") == "zh" and row.get("language", "de") == "de"
+            row for row in ds if row.get("canton") == "zh" and row.get("language", "de") == "de"
         ]
 
         conn = self._get_conn()
@@ -215,6 +214,7 @@ class LawCache:
             # WICHTIG: pdf_content bevorzugen, da html_content im
             # rcds/swiss_legislation Dataset teils falsch zugeordnet ist.
             from openlex_mcp.law_parser import clean_text
+
             rows = conn.execute(
                 "SELECT uuid, title, short_desc, abbreviation, sr_number, "
                 "html_content, pdf_content FROM laws"
@@ -226,8 +226,14 @@ class LawCache:
                 conn.execute(
                     "INSERT INTO laws_fts(uuid, title, short_desc, abbreviation, "
                     "sr_number, body) VALUES (?, ?, ?, ?, ?, ?)",
-                    (row["uuid"], row["title"], row["short_desc"],
-                     row["abbreviation"], row["sr_number"], cleaned),
+                    (
+                        row["uuid"],
+                        row["title"],
+                        row["short_desc"],
+                        row["abbreviation"],
+                        row["sr_number"],
+                        cleaned,
+                    ),
                 )
 
             # Update-Zeitstempel
@@ -258,9 +264,7 @@ class LawCache:
         """Prüft ob der Cache aktuell genug ist."""
         conn = self._get_conn()
         try:
-            row = conn.execute(
-                "SELECT value FROM cache_meta WHERE key = 'last_update'"
-            ).fetchone()
+            row = conn.execute("SELECT value FROM cache_meta WHERE key = 'last_update'").fetchone()
             if not row:
                 return False
             last_update = int(row["value"])
@@ -334,8 +338,9 @@ class LawCache:
         except sqlite3.OperationalError as e:
             # FTS-Syntax-Fehler → Fallback auf einfache LIKE-Suche
             logger.warning("FTS5-Fehler, Fallback auf LIKE: %s", e)
-            return self._search_like(query, active_only=active_only,
-                                     sr_prefix=sr_prefix, limit=limit)
+            return self._search_like(
+                query, active_only=active_only, sr_prefix=sr_prefix, limit=limit
+            )
         finally:
             conn.close()
 
@@ -383,9 +388,7 @@ class LawCache:
         """
         conn = self._get_conn()
         try:
-            row = conn.execute(
-                "SELECT * FROM laws WHERE sr_number = ?", (sr_number,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM laws WHERE sr_number = ?", (sr_number,)).fetchone()
             return dict(row) if row else None
         finally:
             conn.close()
