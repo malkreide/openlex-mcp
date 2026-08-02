@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name        = "openlex-mcp"
-version     = "0.2.4"
+version     = "0.2.5"
 description = "MCP Server for Canton Zurich legislation (ZH-Lex) — full-text search, article extraction, and education law tools"
 readme      = "README.md"
 license     = { file = "LICENSE" }
@@ -36,7 +36,7 @@ dependencies = [
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "structlog>=24.1.0",
+    "structlog>=24.1.0,<27",
     "datasets>=2.14.0",
 ]
 
