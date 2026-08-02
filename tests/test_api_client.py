@@ -1,4 +1,5 @@
 """Unit-Tests für den zh.ch HTTP-Client (HTTP via respx gemockt)."""
+
 from __future__ import annotations
 
 import httpx
@@ -17,8 +18,7 @@ def test_build_zhlex_search_url_converts_dot_to_underscore():
 def test_build_zhlex_permalink_url_uses_ordnungsnummer():
     url = api_client.build_zhlex_permalink_url("412.100")
     assert url == (
-        "https://www.zhlex.zh.ch/bin/zhweb/publish/"
-        "lawcollection-directlink?Open&Ordnr=412.100"
+        "https://www.zhlex.zh.ch/bin/zhweb/publish/lawcollection-directlink?Open&Ordnr=412.100"
     )
 
 

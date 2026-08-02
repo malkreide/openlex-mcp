@@ -1,4 +1,5 @@
 """Unit-Tests für den SQLite/FTS5-Cache (temporäre DB, offline)."""
+
 from __future__ import annotations
 
 

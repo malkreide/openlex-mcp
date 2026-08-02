@@ -3,6 +3,7 @@
 Befüllt einen LawCache mit deterministischen Beispieldaten, ohne den
 HuggingFace-Download auszulösen (Unit-Tests müssen offline laufen).
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -65,10 +66,20 @@ def populate(cache: LawCache, laws: list[dict] | None = None) -> None:
                  version_since, family_since, canton, language)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    law["uuid"], law["title"], law["short_desc"],
-                    law["abbreviation"], law["sr_number"], law["is_active"],
-                    "", "", law["pdf_content"], law["html_content"],
-                    "", "", "zh", "de",
+                    law["uuid"],
+                    law["title"],
+                    law["short_desc"],
+                    law["abbreviation"],
+                    law["sr_number"],
+                    law["is_active"],
+                    "",
+                    "",
+                    law["pdf_content"],
+                    law["html_content"],
+                    "",
+                    "",
+                    "zh",
+                    "de",
                 ),
             )
             conn.execute(
@@ -76,8 +87,12 @@ def populate(cache: LawCache, laws: list[dict] | None = None) -> None:
                 (uuid, title, short_desc, abbreviation, sr_number, body)
                 VALUES (?, ?, ?, ?, ?, ?)""",
                 (
-                    law["uuid"], law["title"], law["short_desc"],
-                    law["abbreviation"], law["sr_number"], law["pdf_content"],
+                    law["uuid"],
+                    law["title"],
+                    law["short_desc"],
+                    law["abbreviation"],
+                    law["sr_number"],
+                    law["pdf_content"],
                 ),
             )
         conn.commit()

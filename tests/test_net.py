@@ -1,4 +1,5 @@
 """Unit-Tests für die Outbound-Härtung (SEC-004 / SEC-021 / SEC-005)."""
+
 from __future__ import annotations
 
 import httpx
@@ -67,9 +68,7 @@ def test_assert_host_allowed_passes_for_legacy_permalink_host():
 async def test_assert_url_allowed_accepts_http_for_legacy_host(monkeypatch):
     # www.zhlex.zh.ch liefert nur über HTTP aus → ausnahmsweise erlaubt.
     monkeypatch.setattr(net, "_resolve", _fake_resolve("203.0.113.10"))
-    ips = await net.assert_url_allowed(
-        "http://www.zhlex.zh.ch/Erlass.html?Open&Ordnr=412.100"
-    )
+    ips = await net.assert_url_allowed("http://www.zhlex.zh.ch/Erlass.html?Open&Ordnr=412.100")
     assert ips == ["203.0.113.10"]
 
 
@@ -120,9 +119,7 @@ async def test_safe_get_pins_ip_and_preserves_host_and_sni(monkeypatch):
     ip = "203.0.113.10"
     monkeypatch.setattr(net, "_resolve", _fake_resolve(ip))
     url = "https://www.zh.ch/page.html"
-    route = respx.get(net._pin_url(url, ip)).mock(
-        return_value=httpx.Response(200, text="ok")
-    )
+    route = respx.get(net._pin_url(url, ip)).mock(return_value=httpx.Response(200, text="ok"))
     async with httpx.AsyncClient() as client:
         resp, final = await net.safe_get(client, url)
     assert resp.status_code == 200

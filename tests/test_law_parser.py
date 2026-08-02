@@ -1,4 +1,5 @@
 """Unit-Tests für den Gesetzes-Parser (reine Funktionen, offline)."""
+
 from __future__ import annotations
 
 from openlex_mcp.law_parser import (

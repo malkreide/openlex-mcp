@@ -1,4 +1,5 @@
 """Unit-Tests für die Server-Tools und das Netzwerk-Binding (SEC-016)."""
+
 from __future__ import annotations
 
 import logging
@@ -51,9 +52,7 @@ async def test_get_law_not_found(server_with_cache):
 
 @pytest.mark.asyncio
 async def test_get_law_includes_content_and_truncation_flag(server_with_cache):
-    resp = await srv.zhlaw_get_law(
-        srv.GetLawInput(identifier="VSG", include_content=True)
-    )
+    resp = await srv.zhlaw_get_law(srv.GetLawInput(identifier="VSG", include_content=True))
     assert resp.results[0].content is not None
     assert resp.results[0].content_truncated is False  # sample text is short
 
@@ -110,7 +109,11 @@ async def test_update_cache_reports_progress_and_info(server_with_cache):
     assert resp.result_type == "cache_status"
     assert resp.count == 1
     assert resp.results[0].status in (
-        "ok", "cache_fresh", "already_loaded", "error", "unknown",
+        "ok",
+        "cache_fresh",
+        "already_loaded",
+        "error",
+        "unknown",
     )
 
 
@@ -203,9 +206,7 @@ async def test_execution_error_raises_masked_toolerror(server_with_cache, cache,
 
 
 @pytest.mark.asyncio
-async def test_execution_error_logs_structured_context(
-    server_with_cache, cache, monkeypatch
-):
+async def test_execution_error_logs_structured_context(server_with_cache, cache, monkeypatch):
     # OBS-003: the original error is logged via structlog with bound per-call
     # context (tool name + correlation id) and exception info — masked from the
     # LLM-facing result.
