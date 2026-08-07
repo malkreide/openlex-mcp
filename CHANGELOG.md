@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Geändert
+
+- **Retry-Politik gegenüber zh.ch: begrenzt, gestreut, gehorsam (`ARCH-014`).**
+  Ein Portfolio-Durchlauf des Audit-Katalogs am 2026-08-07 las die Schleife in
+  `fetch_zhlex_metadata` von Hand. Vier Eigenschaften fehlten.
+
+  | Eigenschaft | Vorher | Jetzt |
+  |---|---|---|
+  | 5xx / 429 | **gar nicht wiederholt** — endete sofort als Fehler-Dict | wiederholt |
+  | Netzfehler | nur `TimeoutException` und `ConnectError` | zusätzlich die Oberklasse `RequestError` |
+  | Jitter | keiner — feste Leiter 1 s, 2 s | gestreut in `[0.5x, 1.5x]` |
+  | `Retry-After` | nicht gelesen | gelesen (beide RFC-9110-Formen), schlägt die eigene Kurve |
+  | Deckel | keiner | `METADATA_MAX_DELAY`, **nach** dem Jitter |
+  | Zeitbudget | keines | `METADATA_TOTAL_BUDGET = 25.0` an `asyncio.timeout` |
+
+  **Der schwerste Punkt ist der erste.** Ein 503 von zh.ch lief in den
+  `httpx.HTTPStatusError`-Zweig und wurde dort zu `{"found": False, "error":
+  "HTTP 503"}` — ohne einen zweiten Versuch. Der Server hatte eine
+  Retry-Schleife, die den häufigsten transienten Fall nicht abdeckte: Ein
+  überlastetes Gateway ist eine Aussage über den Moment, kein Ergebnis.
+
+  **Und ein zweiter, leiserer:** Ein Verbindungsabbruch, der weder
+  `TimeoutException` noch `ConnectError` heisst — etwa `httpx.ReadError` —
+  fiel in den `except Exception`-Zweig und wurde ebenfalls zum Fehler-Dict.
+  Gefangen wird jetzt die Oberklasse.
+
+  **Eine deterministische Leiter ist ein Retry-Sturm:** Jeder Client, der
+  denselben Ausfall trifft, kommt im selben Moment zurück, und die Last kehrt
+  als Welle wieder — genau wenn sich die Quelle erholt.
+
+  **`REQUEST_TIMEOUT` war nie ein Budget.** httpx begrenzt pro Operation, und
+  sein Read-Timeout beginnt mit jedem Chunk von vorn. Drei Versuche gegen einen
+  Upstream, der die vollen 30 s braucht, sind anderthalb Minuten in einem
+  Tool-Aufruf, und `METADATA_MAX_ATTEMPTS` sagt das nirgends. Die 25 s hängen
+  jetzt an `asyncio.timeout` und liegen unter dem 30-s-Default des MCP-SDK.
+
+### Hinzugefügt
+
+- **`tests/test_retry_policy.py`** — der Retry-Pfad hatte zwei Tests, beide
+  über Timeouts. Die neuen decken alle sechs Eigenschaften ab, jede mit
+  Gegenprobe.
+
+- **Die Backoff-Naht liegt jetzt in `tests/conftest.py`** und gilt für die
+  ganze Suite: `api_client._sleep` statt `asyncio.sleep`. Ein
+  `monkeypatch.setattr(api_client.asyncio, "sleep", ...)` sähe lokal aus und
+  legt das Schlafen prozessweit still — samt fremder Tests, die damit dem
+  Event-Loop das Wort geben. Nebeneffekt: Die beiden bestehenden Retry-Tests
+  schlafen nicht mehr echt, die Suite wird um rund 3,3 s schneller.
+
 ## [0.2.5] - 2026-08-02
 
 ### Fixed
