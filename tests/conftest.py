@@ -10,6 +10,7 @@ import sqlite3
 
 import pytest
 
+from openlex_mcp import api_client
 from openlex_mcp.data_cache import LawCache
 
 # Deterministische Beispielgesetze für Unit-Tests.
@@ -125,3 +126,20 @@ def server_with_cache(cache, monkeypatch):
 
     monkeypatch.setattr(srv, "_cache", cache)
     return srv
+
+
+@pytest.fixture(autouse=True)
+def _no_backoff(monkeypatch):
+    """Nullt die Wartezeit, ohne ``asyncio.sleep`` prozessweit stillzulegen.
+
+    Gepatcht wird ``api_client._sleep``. Ein
+    ``monkeypatch.setattr(api_client.asyncio, "sleep", ...)`` sähe lokal aus
+    und trifft das stdlib-Modul — jeder Test, der ``asyncio.sleep`` benutzt, um
+    dem Event-Loop das Wort zu geben, misst danach nichts mehr und bleibt grün.
+    ``test_die_fixture_laesst_das_echte_asyncio_sleep_in_ruhe`` bewacht die Naht.
+    """
+
+    async def _instant(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr(api_client, "_sleep", _instant)
