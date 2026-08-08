@@ -1,0 +1,35 @@
+{
+  "recorded_at": "2026-08-08",
+  "hosts": {
+    "www.zh.ch": {
+      "dns_status": 0,
+      "dns_label": "NOERROR",
+      "adressen": [
+        "194.247.8.174"
+      ],
+      "warum": "Metadatenseite, von `fetch_zhlex_metadata` gebaut"
+    },
+    "zhlex.zh.ch": {
+      "dns_status": 0,
+      "dns_label": "NOERROR",
+      "adressen": [
+        "194.247.8.174"
+      ],
+      "warum": "Permalink-Basis, von `build_zhlex_permalink` gebaut"
+    },
+    "www.lexfind.ch": {
+      "dns_status": 0,
+      "dns_label": "NOERROR",
+      "adressen": [
+        "93.187.192.244"
+      ],
+      "warum": "Suchlink, von `build_lexfind_url` gebaut"
+    },
+    "diesen-host-gibt-es-sicher-nicht.zh.ch": {
+      "dns_status": 3,
+      "dns_label": "NXDOMAIN",
+      "adressen": [],
+      "warum": "KONTROLLE: erfundener Name"
+    }
+  }
+}

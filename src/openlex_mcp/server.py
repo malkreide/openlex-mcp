@@ -948,16 +948,22 @@ async def zhlaw_get_law_metadata(params: GetLawMetadataInput) -> MetadataRespons
 async def zhlaw_update_cache(ctx: Context, params: UpdateCacheInput) -> CacheStatusResponse:
     """Aktualisiert den lokalen Cache der Zürcher Gesetzesdaten.
 
-    <use_case>Nur aufrufen wenn Gesetzes-Suchergebnisse veraltet wirken oder
-    der Cache explizit neu geladen werden soll. Der Cache wird automatisch beim
-    Start befüllt und ist 24 Stunden gültig — manuelles Update ist selten
-    nötig.</use_case>
+    <use_case>Nur aufrufen wenn der Cache explizit neu geladen werden soll.
+    Der Cache wird automatisch beim Start befüllt und ist 24 Stunden gültig —
+    manuelles Update ist selten nötig.</use_case>
 
     <important_notes>Lädt ~970 Gesetze von HuggingFace (rcds/swiss_legislation)
     in die lokale SQLite-DB mit FTS5-Index (~25 s erster Lauf). force=False
     überspringt den Download wenn Cache <24h alt (gibt status='cache_fresh'
     zurück). force=True erzwingt Neudownload. Erfordert Internetzugang zu
-    HuggingFace.</important_notes>
+    HuggingFace.
+
+    ACHTUNG — dieses Werkzeug macht die GESETZE nicht aktueller. Es lädt
+    denselben Datensatz erneut, und der ist eingefroren: Die jüngste Fassung
+    darin stammt vom 2023-01-01 (gemessen am 2026-08-08; der Datensatz selbst
+    wurde zuletzt am 2024-10-10 angefasst). Bei Zweifeln an der Aktualität
+    eines Wortlauts hilft nur der ZH-Lex-Permalink, nicht dieses
+    Werkzeug.</important_notes>
 
     <example>force=False</example>
     """

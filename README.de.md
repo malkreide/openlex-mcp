@@ -324,6 +324,9 @@ Alle Tools liefern ein **strukturiertes Response-Envelope** (kein Markdown-Text)
 - **Erststart:** Erster Start benötigt ~25s zum Herunterladen und Indexieren von 974 Gesetzen von HuggingFace (~38 MB SQLite-Datenbank)
 - **zh.ch-Metadaten:** Keine offizielle API; Metadaten-Extraktion basiert auf HTML-Mustern, die sich ändern können
 - **Offline-Modus:** Volltextsuche funktioniert offline nach Erststart; Live-Metadaten benötigen Internet
+- **Der Bestand ist auf dem Stand vom 2023-01-01 eingefroren.** Das ist bei einer Rechtssammlung die Einschränkung, die am meisten zählt — und die einzige, die nicht dastand. Die jüngste Fassung im gesamten Datensatz trägt `version_active_since = 2023-01-01`; der HuggingFace-Datensatz selbst wurde zuletzt am 2024-10-10 angefasst. Die 24-Stunden-Gültigkeit des Caches und `provenance="cache"` beschreiben, woher eine Antwort kam, nicht wie alt die Gesetze darin sind. Jede Antwort trägt jetzt `corpus_as_of` und `corpus_note` neben `provenance`.
+- **Aufhebungen nach dem Stichtag sind unsichtbar.** Alle 974 Einträge tragen `is_active = True`, und kein einziger führt ein `version_inactive_since`. Das ist kein Fehler des Servers — die Quelle führt ausschliesslich die zum Aufnahmezeitpunkt geltenden Erlasse. Die Folge zählt: Ein seither aufgehobenes Gesetz erscheint weiterhin als in Kraft. Für den geltenden Wortlaut den ZH-Lex-Permalink konsultieren.
+- **`zhlaw_update_cache` macht die Gesetze nicht aktueller.** Es lädt denselben eingefrorenen Datensatz erneut. Sein Docstring lautete zuvor «Nur aufrufen wenn Gesetzes-Suchergebnisse veraltet wirken» — das legte genau die Wirkung nahe, die es nicht hat.
 
 ---
 
@@ -351,12 +354,34 @@ Um eine Sicherheitslücke zu melden, siehe die [Sicherheitsrichtlinie](SECURITY.
 ## Tests
 
 ```bash
-# Unit-Tests (kein API-Key erforderlich)
+# Unit- und Vertragstests (ohne Netz) — das fährt die CI
 PYTHONPATH=src pytest tests/ -m "not live"
 
-# Integrationstests (Live-API-Aufrufe)
-pytest tests/ -m "live"
+# Live-Tests gegen zh.ch und HuggingFace
+PYTHONPATH=src pytest tests/ -m "live"
+
+# Bestandsstand und Live-Hosts neu messen
+PYTHONPATH=src python scripts/record_fixtures.py
 ```
+
+**150 Tests** — 142 offline, 8 live. Acht Werkzeuge, acht Live-Tests: die beste
+Abdeckung dieses Portfolios. Genau deshalb liegt der Befund hier nicht in der
+Mechanik, sondern in der Verwechslung zweier Fragen. `provenance="cache"`
+beantwortet, *woher* eine Antwort kam; `corpus_as_of` beantwortet, *wie alt die
+Gesetze darin sind*. Beantwortet wurde bisher nur die erste — gemeint ist die
+zweite, wenn jemand fragt «ist das aktuell?».
+
+### Eine Messgrenze, die bewusst nicht durch Anpassen eines Tests behoben wurde
+
+`test_live_get_law_metadata` scheitert in der Aufzeichnungsumgebung:
+`zhlex.zh.ch` ist von dort nicht erreichbar. **Daraus folgt nichts.** Das
+öffentliche DNS führt den Host (NOERROR, 194.247.8.174), und eine
+NXDOMAIN-Kontrolle zeigt, dass die Abfrage unterscheidet — die Grenze liegt
+also bei der Umgebung, nicht bei der Quelle.
+
+Der Test blieb deshalb unangetastet. Ein Test, den man rot sieht, weil das
+eigene Netz nicht hinauskommt, gehört nicht umgeschrieben; danach würde er die
+eigene Umgebung messen statt die Quelle. `PROVENANCE.md` führt das als offen.
 
 ---
 

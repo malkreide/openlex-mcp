@@ -325,6 +325,9 @@ clients receive `structuredContent` they can parse directly:
 - **Initial load:** First start requires ~25s to download and index 974 laws from HuggingFace (~38 MB SQLite database)
 - **zh.ch metadata:** No official API; metadata extraction relies on HTML patterns that may change
 - **Offline mode:** Full-text search works offline after initial load; live metadata requires internet
+- **The corpus is frozen at 2023-01-01.** This is the limitation that matters most for a legal server, and it was the one not stated. The newest version in the entire dataset carries `version_active_since = 2023-01-01`; the HuggingFace dataset itself was last touched 2024-10-10. The 24-hour cache TTL and `provenance="cache"` describe where an answer came from, not how old the laws in it are. Every response now carries `corpus_as_of` and `corpus_note` alongside `provenance`.
+- **Repeals after the cut-off are invisible.** All 974 entries carry `is_active = True` and not one has a `version_inactive_since`. That is not a server bug — the source lists only the statutes in force at snapshot time. The consequence is what matters: a law repealed since then still appears to be in force. Consult the ZH-Lex permalink for the operative text.
+- **`zhlaw_update_cache` does not make the laws newer.** It re-downloads the same frozen dataset. Its docstring previously read "only call when law search results seem outdated", which suggested exactly the effect it does not have.
 
 ---
 
@@ -352,12 +355,34 @@ To report a vulnerability, see the [Security Policy](SECURITY.md).
 ## Testing
 
 ```bash
-# Unit tests (no API key required)
+# Unit + contract tests (no network) — this is what CI runs
 PYTHONPATH=src pytest tests/ -m "not live"
 
-# Integration tests (live API calls)
-pytest tests/ -m "live"
+# Live tests against zh.ch and HuggingFace
+PYTHONPATH=src pytest tests/ -m "live"
+
+# Re-measure the corpus date and the live hosts
+PYTHONPATH=src python scripts/record_fixtures.py
 ```
+
+**150 tests** — 142 offline, 8 live. Eight tools, eight live tests: the best
+coverage in this portfolio, which is why the finding here is not about
+mechanics but about a confusion between two questions. `provenance="cache"`
+answers *where* an answer came from; `corpus_as_of` answers *how old the laws
+in it are*. Only the first was ever answered, and the second is the one a user
+means when they ask "is this current?".
+
+### A measurement limit, deliberately not resolved by editing a test
+
+`test_live_get_law_metadata` fails in the recording environment: `zhlex.zh.ch`
+is not reachable from it. **Nothing follows from that.** Public DNS resolves
+the host (NOERROR, 194.247.8.174) and an NXDOMAIN control shows the query
+discriminates — so the limit is the environment's, not the source's.
+
+The test was therefore left untouched. A test you see red because your own
+network cannot get out is not a test to rewrite; rewriting it would leave you
+measuring your own environment instead of the source. `PROVENANCE.md` records
+this as open.
 
 ---
 

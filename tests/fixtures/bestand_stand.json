@@ -1,0 +1,11 @@
+{
+  "recorded_at": "2026-08-08",
+  "datensatz": "rcds/swiss_legislation",
+  "hf_last_modified": "2024-10-10T08:08:35.000Z",
+  "gesetze_im_cache": 974,
+  "juengste_fassung": "2023-01-01",
+  "is_active_verteilung": {
+    "1": 974
+  },
+  "warum": "Der Cache gilt 24 Stunden — der Bestand darin ist Jahre alt. Genau diese Verwechslung stand in der Antwort: `provenance=cache` sagt, WOHER sie kam, nicht WIE ALT sie ist"
+}

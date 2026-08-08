@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Behoben
+
+- **Jede Antwort nennt jetzt den Stand des Bestands, nicht nur den des
+  Caches.** Das ist bei einer Rechtssammlung die Angabe, die zählt, und sie
+  fehlte.
+
+  Gemessen am 2026-08-08: Die jüngste Fassung im gesamten Datensatz trägt
+  `version_active_since = 2023-01-01`; der HuggingFace-Datensatz selbst wurde
+  zuletzt am 2024-10-10 angefasst. Der Cache gilt derweil 24 Stunden, und
+  `provenance="cache"` liest sich wie «aus dem Zwischenspeicher geliefert».
+
+  Beides beantwortet die Frage «woher kam diese Antwort». Wer fragt «ist das
+  aktuell?», meint «wie alt sind die Gesetze darin» — und darauf gab es keine
+  Antwort. Neu tragen alle Antworten `corpus_as_of` und `corpus_note` neben
+  `provenance`.
+
+- **`zhlaw_update_cache` legte eine Wirkung nahe, die es nicht hat.** Sein
+  Docstring lautete «Nur aufrufen wenn Gesetzes-Suchergebnisse veraltet
+  wirken». Das Werkzeug lädt denselben eingefrorenen Datensatz erneut
+  herunter; die Gesetze werden dadurch keinen Tag jünger. Ein Assistent, der
+  den Docstring las, rief es auf und meldete dem Nutzer anschliessend
+  dieselben Fassungen von 2023 als frisch geladen.
+
+  Der Docstring nennt jetzt den Bestandsstand und verweist für den geltenden
+  Wortlaut auf den ZH-Lex-Permalink.
+
+- **Aufhebungen nach dem Stichtag waren unsichtbar, und nichts wies darauf
+  hin.** Alle 974 Einträge tragen `is_active = True`, kein einziger führt ein
+  `version_inactive_since`.
+
+  Das ist **kein Fehler dieses Servers** — die Quelle führt ausschliesslich die
+  zum Aufnahmezeitpunkt geltenden Erlasse. Der Nullbefund steht trotzdem
+  aufgezeichnet in `tests/fixtures/bestand_stand.json`, damit er beim nächsten
+  Durchgang nicht erneut als Fehler vermutet wird. Die Folge zählt und steht
+  jetzt in `corpus_note`: Ein seither aufgehobenes Gesetz erscheint weiterhin
+  als in Kraft.
+
+### Hinzugefügt
+
+- **`scripts/record_fixtures.py`, `tests/fixtures/` und `PROVENANCE.md`.** Der
+  Recorder misst den Bestandsstand aus dem Cache des Servers und bricht ab,
+  wenn er sich ändert — auch dann, wenn er *neuer* wird. Ein neuerer Bestand
+  ist eine gute Nachricht und genau deshalb ein Anlass, `BESTAND_STAND`,
+  README und CHANGELOG nachzuziehen, statt die Prüfung anzupassen.
+
+- **`tests/test_bestand_stand.py`** — 8 Tests, die **in** der CI laufen.
+  Gegengeprüft mit drei Rückmutationen: `corpus_as_of` aus dem Envelope
+  entfernen, `BESTAND_STAND` auf ein falsches Datum setzen, die alte
+  Docstring-Formulierung zurückholen. Alle drei machen die Suite rot.
+
+- **Die Grenzen der eigenen Messung sind mit aufgezeichnet.**
+  `test_live_get_law_metadata` scheiterte in der Aufzeichnungsumgebung, weil
+  `zhlex.zh.ch` von dort nicht erreichbar war.
+
+  **Daraus folgt nichts über den Server.** Das öffentliche DNS führt den Host
+  (NOERROR, 194.247.8.174), gegengeprüft mit einer NXDOMAIN-Kontrolle auf einen
+  erfundenen Namen. Die Grenze liegt bei der Umgebung, nicht bei der Quelle.
+
+  Der Test ist deshalb **unangetastet** geblieben. Ein Test, den man rot sieht,
+  weil das eigene Netz nicht hinauskommt, gehört nicht umgeschrieben — danach
+  misst er die eigene Umgebung statt die Quelle. Dieselbe Verwechslung hat in
+  diesem Portfolio schon mehrfach zu falschen Befunden geführt.
+
 ### Geändert
 
 - **Retry-Politik gegenüber zh.ch: begrenzt, gestreut, gehorsam (`ARCH-014`).**
