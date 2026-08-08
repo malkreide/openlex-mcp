@@ -15,6 +15,33 @@ from pydantic import BaseModel, Field
 
 SOURCE = "Kanton Zürich Rechtssammlung — HuggingFace rcds/swiss_legislation (CC-BY-SA 4.0) & zh.ch"
 
+# Der Stand des BESTANDS, nicht der des Caches.
+#
+# WARUM DAS EIN EIGENER BEGRIFF SEIN MUSS. Der Cache gilt 24 Stunden, und
+# `provenance="cache"` liest sich wie «aus dem Zwischenspeicher geliefert».
+# Beides sagt nichts darüber, wie alt die Gesetze selbst sind — und genau das
+# ist bei einer Rechtssammlung die Frage, die zählt. Der Docstring von
+# `zhlaw_update_cache` legte sogar nahe, ein Update behebe Veraltung («Nur
+# aufrufen wenn Gesetzes-Suchergebnisse veraltet wirken»). Es lädt denselben
+# eingefrorenen Stand erneut herunter.
+#
+# Am 2026-08-08 gemessen: Die jüngste Fassung im gesamten Bestand trägt
+# `version_active_since = 2023-01-01`; der HuggingFace-Datensatz wurde zuletzt
+# am 2024-10-10 angefasst.
+#
+# Alle 974 Einträge tragen `is_active = True`, und **kein einziger** führt ein
+# `version_inactive_since`. Das ist kein Fehler des Servers — die Quelle führt
+# ausschliesslich die zum Aufnahmezeitpunkt gültigen Erlasse. Es heisst aber:
+# Ein Gesetz, das nach dem Stichtag aufgehoben wurde, erscheint hier weiterhin
+# als in Kraft, und nichts an der Antwort deutete darauf hin.
+BESTAND_STAND = "2023-01-01"
+BESTAND_HINWEIS = (
+    f"Bestandsstand {BESTAND_STAND} — die jüngste Fassung im Datensatz stammt "
+    "von diesem Datum. Spätere Änderungen und Aufhebungen fehlen; ein "
+    "zwischenzeitlich aufgehobenes Gesetz erscheint weiterhin als in Kraft. "
+    "Für den geltenden Wortlaut den ZH-Lex-Permalink konsultieren."
+)
+
 Provenance = Literal["cache", "live", "parser", "cache+parser", "none"]
 
 
@@ -90,10 +117,21 @@ class CacheStatusItem(BaseModel):
 
 
 class Envelope(BaseModel):
-    """Gemeinsames Response-Envelope (source / provenance / count / message)."""
+    """Gemeinsames Response-Envelope (source / provenance / count / message).
+
+    `corpus_as_of` steht bewusst neben `provenance`. Die beiden beantworten
+    verschiedene Fragen, und nur die zweite wurde bisher beantwortet:
+
+    * `provenance="cache"` — woher diese Antwort kam.
+    * `corpus_as_of="2023-01-01"` — wie alt die Gesetze darin sind.
+
+    Ein Nutzer, der «ist das aktuell?» fragt, meint die zweite.
+    """
 
     source: str = SOURCE
     provenance: Provenance
+    corpus_as_of: str = BESTAND_STAND
+    corpus_note: str = BESTAND_HINWEIS
     count: int = 0
     message: str | None = None
 
