@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Drei Tests patchten eine Naht, die der Code nicht mehr benutzt.**
+  `api_client` legt den Backoff-Schlaf seit laengerem als `_sleep` offen, doch
+  `tests/test_api_client.py` ersetzte weiterhin `api_client.asyncio.sleep` —
+  also `sleep` auf dem geteilten stdlib-Modul, prozessweit. Wirkung hatte es
+  dort keine, weil diese Tests `net.safe_get` faelschen und nie in den Retry
+  laufen; die Gefahr blieb trotzdem. Jetzt patchen sie `api_client._sleep`,
+  wie conftest und die Retry-Tests es bereits taten.
+
 ### Behoben
 
 - **Jede Antwort nennt jetzt den Stand des Bestands, nicht nur den des

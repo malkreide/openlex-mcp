@@ -125,7 +125,7 @@ async def test_fetch_zhlex_metadata_retries_transient_then_succeeds(monkeypatch)
         )
 
     monkeypatch.setattr(api_client.net, "safe_get", fake_safe_get)
-    monkeypatch.setattr(api_client.asyncio, "sleep", _no_sleep)
+    monkeypatch.setattr(api_client, "_sleep", _no_sleep)
 
     meta = await api_client.fetch_zhlex_metadata("412.100")
     assert calls["n"] == 2
@@ -143,7 +143,7 @@ async def test_fetch_zhlex_metadata_exhausts_retries_on_timeout(monkeypatch):
         raise httpx.ReadTimeout("slow")
 
     monkeypatch.setattr(api_client.net, "safe_get", fake_safe_get)
-    monkeypatch.setattr(api_client.asyncio, "sleep", _no_sleep)
+    monkeypatch.setattr(api_client, "_sleep", _no_sleep)
 
     meta = await api_client.fetch_zhlex_metadata("412.100")
     assert calls["n"] == api_client.METADATA_MAX_ATTEMPTS
@@ -161,7 +161,7 @@ async def test_fetch_zhlex_metadata_does_not_retry_404(monkeypatch):
         return httpx.Response(404), url
 
     monkeypatch.setattr(api_client.net, "safe_get", fake_safe_get)
-    monkeypatch.setattr(api_client.asyncio, "sleep", _no_sleep)
+    monkeypatch.setattr(api_client, "_sleep", _no_sleep)
 
     meta = await api_client.fetch_zhlex_metadata("000.0")
     assert calls["n"] == 1
