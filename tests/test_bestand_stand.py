@@ -105,6 +105,44 @@ class TestGrenzenDerEigenenMessung:
         assert not kontrolle["adressen"]
 
 
+class TestLiveMetadatenAufzeichnung:
+    """Was `zh.ch` zum Zeitpunkt der Aufzeichnung wirklich geliefert hat.
+
+    Am 2026-08-08 blieb dieser Endpunkt ungemessen — die Aufzeichnungsumgebung
+    kam nicht hinaus. Am 2026-08-14 kam sie hinaus, und `live_metadata.json`
+    haelt seither fest, was die Quelle antwortet.
+
+    Der **Seitentitel** ist der Gegenstand. Er ist die Stelle, die still
+    kaputtgeht: Im Portfolio hiess «nicht gefunden» schon einmal nicht, dass
+    der Datensatz weg war, sondern dass die Quelle die Schreibweise ihrer
+    Kopfzeile gewechselt hatte — vier von sechs Datensaetzen produktiv kaputt,
+    alle Unit-Tests gruen. Aendert die Quelle sie erneut, faellt der Test beim
+    naechsten Aufzeichnen und zwingt zum Hinsehen.
+    """
+
+    def test_die_quelle_war_erreichbar_und_hat_den_erlass_gefuehrt(self):
+        m = _fixture("live_metadata.json")
+        assert m["erreichbar"] is True, f"Aufzeichnung ohne Treffer: {m['fehler']}"
+        assert m["sr_number"] == "412.100"
+
+    def test_der_seitentitel_nennt_den_erlass(self):
+        """Faellt, wenn die Quelle ihre Kopfzeile umbenennt.
+
+        Absichtlich am Erlassnamen und nicht am ganzen String: «Volksschulgesetz
+        (VSG) | Kanton Zuerich» traegt Beiwerk, das sich aendern darf, ohne dass
+        etwas kaputt waere. Der Name selbst darf es nicht.
+        """
+        titel = _fixture("live_metadata.json")["seitentitel"]
+        assert titel, "kein Seitentitel aufgezeichnet"
+        assert "Volksschulgesetz" in titel, titel
+
+    def test_die_aufgezeichnete_url_zeigt_auf_die_quelle(self):
+        """Die Ordnungsnummer steht dort in der Unterstrich-Form der Quelle."""
+        url = _fixture("live_metadata.json")["url"]
+        assert url.startswith("https://www.zh.ch/"), url
+        assert "412_100" in url, url
+
+
 class TestUpdateCacheVerspricht:
     """Der Docstring darf keine Wirkung mehr nahelegen, die es nicht gibt."""
 
