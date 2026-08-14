@@ -74,6 +74,42 @@ LIVE_HOSTS = [
 ]
 
 
+def _record_live_metadata(sr_number: str = "412.100") -> dict:
+    """Fragt `zh.ch` ueber den Netzpfad des Servers ab.
+
+    Bewusst ueber `api_client.fetch_zhlex_metadata` und nicht per eigenem
+    `httpx.get`: Gemessen werden soll, was der Server sieht — samt seines
+    IP-Pinnings und seiner Egress-Sperre. Ein Skript, das anders verbindet als
+    der Server, misst den falschen Gegenstand.
+
+    ACHTUNG BEIM AUFZEICHNEN. Steht ein HTTPS-Proxy in der Umgebung, faellt
+    genau dieser Aufruf mit `Connection reset` — der Server verbindet auf die
+    gepinnte IP, und ein Proxy weist die IP-Literal-URL ab. Das ist eine
+    Zustellgrenze der Aufzeichnungsumgebung und keine Aussage ueber die Quelle.
+    Der Rekorder laeuft deshalb ohne Proxy-Variablen:
+
+        env -u HTTPS_PROXY -u https_proxy python scripts/record_fixtures.py
+    """
+    import asyncio
+
+    from openlex_mcp import api_client
+
+    async def _go() -> dict:
+        try:
+            return await api_client.fetch_zhlex_metadata(sr_number)
+        finally:
+            await api_client.aclose_client()
+
+    meta = asyncio.run(_go())
+    return {
+        "sr_number": sr_number,
+        "erreichbar": bool(meta.get("found")),
+        "seitentitel": meta.get("page_title"),
+        "url": meta.get("url"),
+        "fehler": meta.get("error"),
+    }
+
+
 def record() -> int:
     FIXTURES.mkdir(parents=True, exist_ok=True)
     recorded_at = datetime.now(UTC).strftime("%Y-%m-%d")
@@ -193,19 +229,87 @@ def record() -> int:
             DOH,
             "die Hosts der Live-Metadaten ueber oeffentliches DNS-over-HTTPS, "
             "samt einer NXDOMAIN-Kontrolle. Bewusst NICHT ueber den eigenen "
-            "Netzpfad: Aus der Aufzeichnungsumgebung waren zh.ch und "
-            "zhlex.zh.ch nicht erreichbar, und daraus folgt nichts ueber die "
-            "Quelle. Eine Zustellgrenze der eigenen Umgebung ist keine "
-            "Aussage ueber den Bestand — dieser Unterschied ist im Portfolio "
-            "schon mehrfach verwechselt worden",
+            "Netzpfad, und zwar unabhaengig davon, ob der gerade hinauskommt: "
+            "Am 2026-08-08 tat er es nicht, am 2026-08-14 tat er es. Beides "
+            "sagt nichts ueber den Bestand der Quelle, und eine Messung, die "
+            "mal das eine und mal das andere bedeutet, taugt nicht als "
+            "Grundlage — dieser Unterschied ist im Portfolio schon mehrfach "
+            "verwechselt worden",
         )
 
-    _write_provenance(recorded_at, entries)
+    # -- 3) Die Live-Metadaten, ueber den Netzpfad des Servers ---------------
+    #
+    # Am 2026-08-08 war dieser Endpunkt aus der Aufzeichnungsumgebung nicht
+    # erreichbar und blieb deshalb ungemessen. Gelingt er, wird er
+    # aufgezeichnet; gelingt er nicht, bleibt eine vorhandene aeltere Messung
+    # unangetastet stehen. Eine Messung durch eine Nicht-Messung zu ersetzen,
+    # waere ein Rueckschritt, den die Datei nicht zeigen wuerde.
+    live = _record_live_metadata()
+    if live["erreichbar"]:
+        write(
+            "live_metadata.json",
+            {"recorded_at": recorded_at, **live},
+            f"https://www.zhlex.zh.ch/... (Ordnr={live['sr_number']})",
+            "die Antwort von `zhlaw_get_law_metadata` ueber den Netzpfad des "
+            "Servers, samt Seitentitel. Der Titel ist der Teil, der still "
+            "kaputtgeht: Im Portfolio hiess «nicht gefunden» schon einmal "
+            "nicht, dass der Datensatz weg war, sondern dass die Quelle die "
+            "Schreibweise ihrer Kopfzeile gewechselt hatte",
+        )
+    else:
+        print(
+            f"\nWARNUNG  live_metadata.json NICHT neu aufgezeichnet: {live['fehler']}\n"
+            "         Steht ein HTTPS-Proxy in der Umgebung? Der Server pinnt die\n"
+            "         IP, und ein Proxy weist die IP-Literal-URL ab. Dann ohne\n"
+            "         Proxy-Variablen erneut laufen lassen. Eine vorhandene\n"
+            "         aeltere Messung wurde nicht angeruehrt.",
+            file=sys.stderr,
+        )
+
+    _write_provenance(recorded_at, entries, live_gemessen=live["erreichbar"])
     print(f"\nPROVENANCE.md geschrieben, Aufzeichnungsdatum {recorded_at}")
     return 0
 
 
-def _write_provenance(recorded_at: str, entries: list[dict]) -> None:
+def _write_provenance(recorded_at: str, entries: list[dict], live_gemessen: bool) -> None:
+    if live_gemessen:
+        live_abschnitt = [
+            "## Gemessen: die Live-Metadaten",
+            "",
+            "`zhlaw_get_law_metadata` fragt `zh.ch` ab. Am 2026-08-08 war der",
+            "Host aus der Aufzeichnungsumgebung nicht erreichbar und blieb",
+            "ungemessen; `live_metadata.json` schliesst diese Luecke.",
+            "",
+            "Aufgezeichnet ist der **Seitentitel**, denn das ist der Teil, der",
+            "still kaputtgeht. Im Portfolio hiess «nicht gefunden» schon einmal",
+            "nicht, dass der Datensatz weg war, sondern dass die Quelle die",
+            "Schreibweise ihrer Kopfzeile gewechselt hatte — vier von sechs",
+            "Datensaetzen produktiv kaputt, alle Unit-Tests gruen.",
+            "",
+            "Gemessen wird ueber `api_client.fetch_zhlex_metadata`, also mit dem",
+            "IP-Pinning und der Egress-Sperre des Servers. Wer den Rekorder",
+            "hinter einem HTTPS-Proxy laufen laesst, sieht hier `Connection",
+            "reset`: Der Proxy weist die IP-Literal-URL ab. Das ist eine Grenze",
+            "der Aufzeichnungsumgebung, keine Aussage ueber die Quelle.",
+            "",
+        ]
+    else:
+        live_abschnitt = [
+            "## NICHT gemessen: die Live-Metadaten",
+            "",
+            "`zhlaw_get_law_metadata` fragt `www.zh.ch` ab. Aus der",
+            "Aufzeichnungsumgebung war der Host nicht erreichbar. **Daraus folgt",
+            "nichts.** Das oeffentliche DNS fuehrt ihn (NOERROR, 194.247.8.174),",
+            "und die NXDOMAIN-Kontrolle zeigt, dass die Abfrage unterscheidet — die",
+            "Grenze liegt also bei der Aufzeichnungsumgebung, nicht bei der Quelle.",
+            "",
+            "Der entsprechende Live-Test ist deshalb **nicht** angepasst worden.",
+            "Ein Test, den man rot sieht, weil die eigene Umgebung nicht",
+            "hinauskommt, gehoert nicht umgeschrieben — sonst misst er danach die",
+            "Umgebung statt die Quelle.",
+            "",
+        ]
+
     lines = [
         "# Herkunft der Fixtures",
         "",
@@ -230,19 +334,7 @@ def _write_provenance(recorded_at: str, entries: list[dict]) -> None:
         "Erlasse. Ohne diese Zeile wird beim naechsten Durchgang erneut ein",
         "Fehler vermutet, wo keiner ist.",
         "",
-        "## NICHT gemessen: die Live-Metadaten",
-        "",
-        "`zhlaw_get_law_metadata` fragt `www.zh.ch` ab. Aus der",
-        "Aufzeichnungsumgebung war der Host nicht erreichbar. **Daraus folgt",
-        "nichts.** Das oeffentliche DNS fuehrt ihn (NOERROR, 194.247.8.174),",
-        "und die NXDOMAIN-Kontrolle zeigt, dass die Abfrage unterscheidet — die",
-        "Grenze liegt also bei der Aufzeichnungsumgebung, nicht bei der Quelle.",
-        "",
-        "Der entsprechende Live-Test ist deshalb **nicht** angepasst worden.",
-        "Ein Test, den man rot sieht, weil die eigene Umgebung nicht",
-        "hinauskommt, gehoert nicht umgeschrieben — sonst misst er danach die",
-        "Umgebung statt die Quelle.",
-        "",
+        *live_abschnitt,
     ]
     for e in entries:
         lines += [
