@@ -101,8 +101,12 @@ async def test_fetch_zhlex_metadata_404_returns_not_found(monkeypatch):
     assert meta["sr_number"] == "000.0"
 
 
-async def _no_sleep(_seconds: float) -> None:
-    """Stub für asyncio.sleep — Backoff ohne reale Wartezeit im Test."""
+# Die Wartezeit zwischen den Versuchen nullt die autouse-Fixture `_no_backoff`
+# aus `conftest.py`, indem sie `api_client._sleep` ersetzt. Die Tests unten
+# patchen sie deshalb nicht noch einmal selbst: Eine zweite Deklaration
+# derselben Zusicherung ist die Stelle, an der beim naechsten Mal nur eine der
+# beiden nachgezogen wird. `test_die_fixture_laesst_das_echte_asyncio_sleep_in_ruhe`
+# bewacht, dass die Fixture den Alias trifft und nicht `asyncio.sleep` selbst.
 
 
 @pytest.mark.asyncio
@@ -125,7 +129,6 @@ async def test_fetch_zhlex_metadata_retries_transient_then_succeeds(monkeypatch)
         )
 
     monkeypatch.setattr(api_client.net, "safe_get", fake_safe_get)
-    monkeypatch.setattr(api_client, "_sleep", _no_sleep)
 
     meta = await api_client.fetch_zhlex_metadata("412.100")
     assert calls["n"] == 2
@@ -143,7 +146,6 @@ async def test_fetch_zhlex_metadata_exhausts_retries_on_timeout(monkeypatch):
         raise httpx.ReadTimeout("slow")
 
     monkeypatch.setattr(api_client.net, "safe_get", fake_safe_get)
-    monkeypatch.setattr(api_client, "_sleep", _no_sleep)
 
     meta = await api_client.fetch_zhlex_metadata("412.100")
     assert calls["n"] == api_client.METADATA_MAX_ATTEMPTS
@@ -161,7 +163,6 @@ async def test_fetch_zhlex_metadata_does_not_retry_404(monkeypatch):
         return httpx.Response(404), url
 
     monkeypatch.setattr(api_client.net, "safe_get", fake_safe_get)
-    monkeypatch.setattr(api_client, "_sleep", _no_sleep)
 
     meta = await api_client.fetch_zhlex_metadata("000.0")
     assert calls["n"] == 1
