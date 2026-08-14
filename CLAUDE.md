@@ -68,6 +68,13 @@ DRIFT-005 ist damit erfüllt — Live-Tests sind nicht bloss per `-m "not live"`
 ausgeschlossen. Fixture-Provenienz: `tests/fixtures/PROVENANCE.md`,
 aufgezeichnet 2026-08-08, erzeugt von `scripts/record_fixtures.py`.
 
+Der Unit-Lauf geht **nicht** ans Netz: Die autouse-Fixture
+`_kein_datensatz_download_im_unit_lauf` sperrt `datasets.load_dataset` für
+alles ohne `@pytest.mark.live`. Sie wirft eine `BaseException`, weil
+`load_from_huggingface` jeden `Exception` wegfängt und der Wachhund sonst
+still zu `status="error"` würde. Ein Test, der den Datensatz braucht,
+markiert den Cache per `mark_fresh()` als frisch oder stubbt den Aufruf.
+
 ### Der ruff-Pin steht in `pyproject.toml`
 
 Und nur dort — `[project.optional-dependencies].dev` sagt `ruff==0.16.1`, die

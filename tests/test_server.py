@@ -92,29 +92,65 @@ async def test_search_articles(server_with_cache):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_update_cache_reports_progress_and_info(server_with_cache):
+def _ctx() -> MagicMock:
     ctx = MagicMock()
     ctx.info = AsyncMock()
     ctx.warning = AsyncMock()
     ctx.report_progress = AsyncMock()
+    return ctx
+
+
+@pytest.mark.asyncio
+async def test_update_cache_reports_progress_and_info(server_with_cache, monkeypatch):
+    """SDK-003: der Kontext wird bedient — mit gestubbtem Download.
+
+    Vorher rief dieser Test `load_from_huggingface` ungebremst auf und lud ~970
+    Gesetze wirklich von HuggingFace: 12-15 s, und das in jedem der drei
+    Matrix-Jobs eines Laufs, der `-m "not live"` heisst. Den echten Download
+    deckt `test_live.py::test_live_update_cache` bereits ab, dort gehoert er
+    hin.
+
+    Die alte Statuszusicherung nahm jeden Wert an, den der Code erzeugen kann —
+    `server.py` klemmt alles Unbekannte auf `"unknown"`, und `"error"` stand mit
+    in der Liste. Sie konnte deshalb nicht fallen, mit Netz so wenig wie ohne.
+    Hier steht jetzt der eine erwartete Wert.
+    """
+    ctx = _ctx()
+
+    def _fake_load(force: bool = False) -> dict:
+        return {"loaded": 970, "total": 970, "duration_s": 1.5, "status": "ok"}
+
+    monkeypatch.setattr(srv._cache, "load_from_huggingface", _fake_load)
 
     resp = await srv.zhlaw_update_cache(ctx, srv.UpdateCacheInput(force=False))
 
-    # Must have called info() at least once (start message).
     ctx.info.assert_called()
-    # Must have called report_progress() to signal start and completion.
+    # Start und Abschluss werden gemeldet.
     assert ctx.report_progress.call_count >= 2
-    # Result is a structured CacheStatusResponse with a Literal status.
     assert resp.result_type == "cache_status"
     assert resp.count == 1
-    assert resp.results[0].status in (
-        "ok",
-        "cache_fresh",
-        "already_loaded",
-        "error",
-        "unknown",
-    )
+    assert resp.results[0].status == "ok"
+    assert resp.results[0].total == 970
+
+
+@pytest.mark.asyncio
+async def test_update_cache_ohne_force_laedt_einen_frischen_cache_nicht_neu(
+    server_with_cache, mark_fresh
+):
+    """Der `cache_fresh`-Zweig, und zwar ueber die echte `is_fresh()`-Logik.
+
+    Nichts ist hier gestubbt ausser der Uhr im Zeitstempel: Der Cache traegt
+    ein `last_update` von jetzt, `force=False` darf ihn deshalb nicht neu
+    laden. Wuerde er es doch, schluege der Wachhund aus `conftest.py` an —
+    `load_dataset` ist im Unit-Lauf gesperrt.
+    """
+    mark_fresh(srv._cache)
+    ctx = _ctx()
+
+    resp = await srv.zhlaw_update_cache(ctx, srv.UpdateCacheInput(force=False))
+
+    assert resp.results[0].status == "cache_fresh"
+    assert resp.results[0].total == srv._cache.count_laws()
 
 
 # ---------------------------------------------------------------------------
