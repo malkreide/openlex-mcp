@@ -66,14 +66,31 @@ Geplanter Workflow vorhanden: `.github/workflows/live.yml`, cron `0 4 * * *`
 (04:00 UTC) plus `workflow_dispatch`, Befehl `PYTHONPATH=src pytest -m live -v`.
 DRIFT-005 ist damit erfüllt — Live-Tests sind nicht bloss per `-m "not live"`
 ausgeschlossen. Fixture-Provenienz: `tests/fixtures/PROVENANCE.md`,
-aufgezeichnet 2026-08-08, erzeugt von `scripts/record_fixtures.py`.
+zuletzt aufgezeichnet 2026-08-14, erzeugt von `scripts/record_fixtures.py`.
 
-Der Unit-Lauf geht **nicht** ans Netz: Die autouse-Fixture
-`_kein_datensatz_download_im_unit_lauf` sperrt `datasets.load_dataset` für
-alles ohne `@pytest.mark.live`. Sie wirft eine `BaseException`, weil
-`load_from_huggingface` jeden `Exception` wegfängt und der Wachhund sonst
-still zu `status="error"` würde. Ein Test, der den Datensatz braucht,
-markiert den Cache per `mark_fresh()` als frisch oder stubbt den Aufruf.
+**Den Rekorder ohne Proxy-Variablen laufen lassen.** Der Server verbindet auf
+die gepinnte IP, ein HTTPS-Proxy weist die IP-Literal-URL mit `Connection
+reset` ab. Dasselbe lässt `pytest -m live` den Metadaten-Test überspringen —
+das ist eine Grenze der Umgebung, kein Fehler der Quelle und keiner im Code.
+
+### Der Unit-Lauf geht nicht ans Netz
+
+Zwei autouse-Fixtures, beide ausser Kraft bei `@pytest.mark.live`:
+
+- `_kein_datensatz_download_im_unit_lauf` sperrt `datasets.load_dataset`.
+  Wer den Datensatz braucht, markiert den Cache per `mark_fresh()` als frisch
+  oder stubbt den Aufruf.
+- `_kein_netz_im_unit_lauf` sperrt `getaddrinfo` **und** `socket.connect` —
+  eins allein reicht nicht, eine gepinnte IP-Verbindung umgeht die Auflösung.
+  Loopback bleibt erlaubt, `test_transport_security` braucht es.
+
+Beide werfen eine `BaseException`: `load_from_huggingface` fängt jeden
+`Exception`, `fetch_zhlex_metadata` jeden `httpx.HTTPError`. Ein gewöhnlicher
+Fehler verschwände dort, und der Test bliebe grün.
+
+`_kein_netz_im_unit_lauf` löscht ausserdem die Proxy-Variablen. Ohne das war
+die Sperre wirkungslos: Der Proxy dieser Umgebung sitzt auf `127.0.0.1`, also
+auf Loopback, und der Verkehr verliess den Rechner trotzdem.
 
 ### Der ruff-Pin steht in `pyproject.toml`
 
