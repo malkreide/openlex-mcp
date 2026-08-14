@@ -7,6 +7,7 @@ HuggingFace-Download auszulösen (Unit-Tests müssen offline laufen).
 from __future__ import annotations
 
 import sqlite3
+import time
 
 import pytest
 
@@ -143,3 +144,74 @@ def _no_backoff(monkeypatch):
         return None
 
     monkeypatch.setattr(api_client, "_sleep", _instant)
+
+
+def _mark_fresh(cache: LawCache, age_hours: float = 0.0) -> None:
+    """Setzt ``cache_meta.last_update``, damit ``is_fresh()`` greift.
+
+    ``populate()`` schreibt nur ``laws`` und ``laws_fts`` — den Zeitstempel
+    nicht. Ein so befuellter Cache gilt deshalb als veraltet, und ein
+    ``load_from_huggingface(force=False)`` darauf laedt wirklich herunter.
+    """
+    conn = sqlite3.connect(str(cache.db_path))
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO cache_meta (key, value) VALUES ('last_update', ?)",
+            (str(int(time.time() - age_hours * 3600)),),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+class _NetzImUnitLauf(BaseException):
+    """Der Wachhund schlaegt an — und zwar so, dass es niemand wegfaengt.
+
+    Abgeleitet von ``BaseException`` und nicht von ``Exception``, weil
+    ``load_from_huggingface`` seinen Download in ein ``except Exception``
+    huellt: Ein gewoehnlicher Fehler wuerde dort zu ``status="error"`` und
+    verschwaende in einer Log-Zeile. Ein Test mit schwacher Zusicherung bliebe
+    dann gruen — genau die Lage, die diesen Wachhund noetig gemacht hat.
+    """
+
+
+@pytest.fixture
+def mark_fresh():
+    """Reicht ``_mark_fresh`` als Fixture durch — ``tests/`` ist kein Paket,
+    ein ``from tests.conftest import ...`` scheitert deshalb beim Sammeln."""
+    return _mark_fresh
+
+
+@pytest.fixture(autouse=True)
+def _kein_datensatz_download_im_unit_lauf(request, monkeypatch):
+    """Laesst einen echten HuggingFace-Download im Unit-Lauf auflaufen.
+
+    Die Zusage steht seit jeher im Kopf dieser Datei — «Unit-Tests muessen
+    offline laufen» — nur konnte sie nichts durchsetzen. Ein Test hat sie
+    gebrochen und dabei ~970 Gesetze wirklich geladen: 12-15 s pro Matrix-Job,
+    in einem Lauf, der `-m "not live"` heisst. Aufgefallen ist es nur an der
+    Laufzeit, denn die Zusicherung des Tests nahm jeden Status an, auch
+    ``error`` — mit und ohne Netz blieb er gruen.
+
+    Der Patch trifft hier bewusst das fremde Modul, anders als bei
+    ``_no_backoff``: Ihn lokal zu halten waere gerade falsch, denn genau das
+    prozessweite Stillegen ist die Zusage. Und kein Unit-Test misst
+    ``load_dataset`` — wer es ruft, will herunterladen.
+
+    Live-Tests sind ausgenommen; sie duerfen und sollen an die Quelle.
+    """
+    if request.node.get_closest_marker("live"):
+        return
+
+    import datasets
+
+    def _verboten(*_args, **_kwargs):
+        raise _NetzImUnitLauf(
+            'load_dataset() in einem Unit-Test — der Lauf `-m "not live"` geht '
+            "damit ans Netz und dauert je nach Bandbreite Sekunden bis Minuten. "
+            "Den Aufruf stubben, oder den Cache mit `mark_fresh()` als frisch "
+            "markieren. Gehoert der Test wirklich an die Quelle, dann mit "
+            "`@pytest.mark.live` in tests/test_live.py."
+        )
+
+    monkeypatch.setattr(datasets, "load_dataset", _verboten)
