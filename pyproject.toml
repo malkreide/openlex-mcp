@@ -46,7 +46,13 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=5.0.0",
     "respx>=0.21.0",
-    "ruff>=0.4.0",
+    # Exakt gepinnt, und zwar hier: Ein Lint- und Format-Gate ist nur dann eine
+    # Zusicherung, wenn lokal dieselbe Version läuft wie in der CI. Vorher stand
+    # der Pin allein in `ci.yml`, während diese Zeile `>=0.4.0` sagte — ein
+    # frisches `pip install -e ".[dev]"` zog damit die jeweils neuste ruff, und
+    # die meldete Abweichungen, die niemand verursacht hatte. Ein Bump gehört in
+    # einen eigenen Commit, zusammen mit den Formatierungen, die er auslöst.
+    "ruff==0.16.1",
 ]
 
 [project.scripts]

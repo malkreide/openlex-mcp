@@ -29,11 +29,11 @@ jobs:
         run: |
           PYTHONPATH=src pytest tests/ -m "not live"
 
-      # Pin ruff so an upstream release cannot change the default rule set or
-      # formatter and break CI on unrelated, untouched code.
-      - name: Install pinned ruff
-        run: pip install ruff==0.16.1
-
+      # ruff is pinned in pyproject.toml's [dev] extra, so the version installed
+      # above is the one that runs here — and the same one a contributor gets
+      # locally. Do not re-add a `pip install ruff==...` step: a second
+      # declaration is what let the local and CI versions drift apart before.
+      # `tests/test_toolchain_pin.py` fails if one reappears.
       - name: Lint
         run: ruff check src/ tests/ scripts/
 
