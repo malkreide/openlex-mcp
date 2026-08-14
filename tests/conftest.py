@@ -6,6 +6,8 @@ HuggingFace-Download auszulösen (Unit-Tests müssen offline laufen).
 
 from __future__ import annotations
 
+import ipaddress
+import socket
 import sqlite3
 import time
 
@@ -215,3 +217,77 @@ def _kein_datensatz_download_im_unit_lauf(request, monkeypatch):
         )
 
     monkeypatch.setattr(datasets, "load_dataset", _verboten)
+
+
+def _ist_lokal(host: object) -> bool:
+    """Loopback und namenlose Adressen — alles, was den Rechner nicht verlaesst.
+
+    ``test_transport_security`` bindet und verbindet auf 127.0.0.1; das ist
+    kein Netzzugriff im hier gemeinten Sinn und muss erlaubt bleiben.
+    """
+    try:
+        return ipaddress.ip_address(str(host)).is_loopback
+    except ValueError:
+        return str(host) in ("localhost", "")
+
+
+@pytest.fixture(autouse=True)
+def _kein_netz_im_unit_lauf(request, monkeypatch):
+    """Sperrt jede Verbindung nach draussen — nicht nur den Datensatz.
+
+    ``_kein_datensatz_download_im_unit_lauf`` deckt genau einen Weg ab. Dass
+    die Suite sonst nirgends hinausgeht, war bis zur Messung am 2026-08-14 eine
+    Annahme: Ein Lauf mit aufzeichnendem Socket zeigte null externe Zugriffe
+    ueber alle 153 Tests, gegengeprueft an den Live-Tests, wo dasselbe
+    Instrument 21 Zugriffe sah. Diese Fixture haelt den Befund fest, statt ihn
+    zu wiederholen.
+
+    Gesperrt wird an zwei Stellen, weil eine nicht reicht: ``getaddrinfo``
+    faengt den Namen, ``socket.connect`` die schon aufgeloeste Adresse. Wer nur
+    das eine nimmt, laesst gepinnte IP-Verbindungen durch — und genau so
+    verbindet dieser Server.
+
+    Wieder eine ``BaseException``: ``fetch_zhlex_metadata`` faengt jeden
+    ``httpx.HTTPError`` und antwortet mit ``found=False``. Ein gewoehnlicher
+    Fehler verschwaende dort, und der Test bliebe gruen.
+
+    Die Proxy-Variablen fallen mit, und das ist kein Beiwerk. Steht ein Proxy
+    auf ``127.0.0.1`` — in der Entwicklungsumgebung dieses Servers tut er das —,
+    dann verbindet ``httpx`` dorthin, die Adresse ist Loopback, die Sperre
+    laesst sie durch, und der Verkehr verlaesst den Rechner trotzdem. Genau so
+    lief die erste Fassung dieser Fixture ins Leere: Ein Test, der
+    ``https://example.com/`` abrief, blieb gruen.
+    """
+    if request.node.get_closest_marker("live"):
+        return
+
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"):
+        monkeypatch.delenv(name, raising=False)
+        monkeypatch.delenv(name.lower(), raising=False)
+
+    echtes_getaddrinfo = socket.getaddrinfo
+    echtes_connect = socket.socket.connect
+
+    def _gai(host, port, *args, **kwargs):
+        if not _ist_lokal(host):
+            raise _NetzImUnitLauf(
+                f"DNS-Aufloesung von {host!r} in einem Unit-Test. Der Lauf "
+                '`-m "not live"` bleibt offline: Antworten der Quelle gehoeren '
+                "gestubbt (respx) oder als Fixture aufgezeichnet. Soll der Test "
+                "wirklich an die Quelle, dann mit `@pytest.mark.live` in "
+                "tests/test_live.py."
+            )
+        return echtes_getaddrinfo(host, port, *args, **kwargs)
+
+    def _connect(self, address):
+        host = address[0] if isinstance(address, tuple) else address
+        if not _ist_lokal(host):
+            raise _NetzImUnitLauf(
+                f"Verbindung nach {host!r} in einem Unit-Test — siehe die "
+                "Meldung zur DNS-Sperre. Ein gepinnter Aufruf umgeht "
+                "`getaddrinfo`, deshalb steht hier eine zweite Sperre."
+            )
+        return echtes_connect(self, address)
+
+    monkeypatch.setattr(socket, "getaddrinfo", _gai)
+    monkeypatch.setattr(socket.socket, "connect", _connect)
