@@ -234,3 +234,80 @@ async def test_die_fixture_laesst_das_echte_asyncio_sleep_in_ruhe():
     started = time.monotonic()
     await asyncio.sleep(0.05)
     assert time.monotonic() - started >= 0.04, "asyncio.sleep ist prozessweit ausser Kraft"
+
+
+# --- Und die andere Haelfte: dass die Fixture die Wartezeit wirklich nullt ---
+#
+# Der Test oben bewacht, was die Fixture *nicht* treffen darf. Er sagt nichts
+# darueber, ob sie ueberhaupt etwas bewirkt: Nimmt man sie heraus, bleiben alle
+# Tests gruen, nur langsamer (4.97 s statt 0.60 s in `test_api_client.py`).
+# Genau das ist die Lage, vor der CLAUDE.md warnt — eine Mechanik ohne
+# Zusicherung. Die beiden Tests hier stellen sie her.
+#
+# Gemessen wird an der Wanduhr, denn nur sie kann die Aussage widerlegen. Eine
+# Fake-Uhr, die beim Schlafen vorrueckt, wuerde auch die kaputte Fassung gruen
+# lassen. Der Jitter wird bewusst NICHT festgenagelt: `api_client.random` *ist*
+# das stdlib-Modul, ein Patch darauf haette denselben prozessweiten Effekt wie
+# der auf `asyncio.sleep`. Stattdessen haengen die Schranken an der garantierten
+# Untergrenze der Leiter, die unabhaengig vom Zufall gilt.
+
+# Lang genug, dass eine echte Wartezeit unuebersehbar ist, und kurz genug, dass
+# ein Fehlschlag die Suite nicht aufhaelt.
+_SPUERBAR = 1.0
+
+
+def _echte_wartezeit_untergrenze() -> float:
+    """Was ein erschoepfter Retry-Pfad mindestens real schliefe.
+
+    Die Leiter ist ``base * 2**(n-1)``, der Jitter multipliziert mit
+    ``[1 - spread, 1 + spread]``. Die Untergrenze nimmt den kleinsten Faktor —
+    unter diesen Wert kommt kein Durchgang, wie der Zufall auch faellt.
+    """
+    stufen = sum(2**n for n in range(api_client.METADATA_MAX_ATTEMPTS - 1))
+    return api_client.METADATA_BACKOFF_BASE * stufen * (1.0 - api_client.METADATA_JITTER_SPREAD)
+
+
+async def test_die_fixture_nullt_die_wartezeit():
+    """Die Naht selbst: ``_sleep`` kostet keine Zeit mehr.
+
+    Faellt, sobald die autouse-Fixture entfernt oder wirkungslos wird — dann
+    dauert dieser Aufruf seine vollen ``_SPUERBAR`` Sekunden.
+    """
+    started = time.monotonic()
+    await api_client._sleep(_SPUERBAR)
+    verstrichen = time.monotonic() - started
+    assert verstrichen < _SPUERBAR / 4, (
+        f"`api_client._sleep` hat {verstrichen:.2f} s wirklich gewartet — die "
+        "autouse-Fixture `_no_backoff` greift nicht mehr."
+    )
+
+
+async def test_der_erschoepfte_retry_pfad_kostet_keine_echte_zeit(monkeypatch):
+    """Und die Wirkung dort, wo sie zaehlt: im Retry-Pfad des Aufrufs.
+
+    Drei Versuche mit der Leiter 1 s / 2 s schlafen real mindestens 1.5 s. Bleibt
+    der Aufruf klar darunter, ist die Wartezeit genullt — und zwar die, die der
+    Code tatsaechlich nimmt, nicht bloss die Funktion, die ihn dahin bringt.
+    """
+    untergrenze = _echte_wartezeit_untergrenze()
+    if untergrenze < _SPUERBAR:
+        pytest.skip(
+            f"Backoff-Leiter zu kurz ({untergrenze:.2f} s), um echte von "
+            "genullter Wartezeit zu trennen — diese Zusicherung waere nicht mehr "
+            "widerlegbar und damit wertlos."
+        )
+
+    calls = _stub_safe_get(monkeypatch, [httpx.ReadTimeout("slow")])
+
+    started = time.monotonic()
+    result = await api_client.fetch_zhlex_metadata(SR)
+    verstrichen = time.monotonic() - started
+
+    # Ohne diese Zeile misst der Test womoeglich einen Pfad, der gar nicht
+    # wiederholt hat — und «schnell» hiesse dann nur «nie geschlafen».
+    assert len(calls) == api_client.METADATA_MAX_ATTEMPTS
+    assert result["found"] is False
+    assert verstrichen < untergrenze / 3, (
+        f"Der Aufruf brauchte {verstrichen:.2f} s; ab {untergrenze:.2f} s waere "
+        "real geschlafen worden. Die autouse-Fixture `_no_backoff` greift nicht mehr."
+    )

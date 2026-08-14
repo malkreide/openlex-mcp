@@ -84,9 +84,20 @@ samt der Formatierungen, die er auslöst.
 
 Die autouse-Fixture `_no_backoff` in `tests/conftest.py` nullt die Wartezeit
 über den Alias `api_client._sleep`. Einzeltests patchen das **nicht** noch
-einmal selbst. Sie hält Tests schnell (4.97 s → 0.60 s in
-`test_api_client.py`) und ist keine Zusicherung: Wer sie neutralisiert, sieht
-alle Tests grün bleiben, nur langsamer. Was sie absichert, ist die Naht —
-`monkeypatch.setattr` fällt laut, sobald der Alias umbenannt wird, und
-`test_die_fixture_laesst_das_echte_asyncio_sleep_in_ruhe` bewacht, dass nicht
-doch `asyncio.sleep` selbst getroffen wird.
+einmal selbst.
+
+Drei Tests in `tests/test_retry_policy.py` halten sie fest, jeder gegen eine
+andere Art, sie kaputtzumachen:
+
+- `test_die_fixture_nullt_die_wartezeit` — wirkt sie überhaupt? Fällt, sobald
+  sie entfernt oder wirkungslos wird.
+- `test_der_erschoepfte_retry_pfad_kostet_keine_echte_zeit` — wirkt sie dort,
+  wo der Code wirklich schläft? Drei Versuche schlafen real ≥ 1.5 s.
+- `test_die_fixture_laesst_das_echte_asyncio_sleep_in_ruhe` — trifft sie den
+  Alias und nicht `asyncio.sleep` selbst?
+
+Gemessen wird an der Wanduhr (`time.monotonic`), weil nur sie diese Aussagen
+widerlegen kann. Den Jitter dabei **nicht** festnageln: `api_client.random`
+ist das stdlib-Modul, ein Patch darauf wirkt prozessweit — dieselbe Falle wie
+bei `asyncio.sleep`. Die Schranken hängen deshalb an der garantierten
+Untergrenze der Leiter, die unabhängig vom Zufall gilt.
