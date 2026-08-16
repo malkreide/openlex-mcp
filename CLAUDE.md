@@ -104,6 +104,9 @@ samt der Formatierungen, die er auslöst.
 
 `.pre-commit-config.yaml` existiert nicht.
 
+Vor dem Lauf `ruff --version` prüfen: ein älteres ruff früher im `PATH`
+schlägt den Pin, ohne dass der Install etwas meldet.
+
 ### Backoff in Tests
 
 Die autouse-Fixture `_no_backoff` in `tests/conftest.py` nullt die Wartezeit
