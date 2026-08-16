@@ -72,7 +72,16 @@ ruff format --check src/ tests/ scripts/
 python scripts/check_version_sync.py
 ```
 
-Matrix: Python 3.11 / 3.12 / 3.13.
+Matrix: Python 3.11 / 3.12 / 3.13; alle Gates laufen auf allen drei Feldern,
+keine `if:`-Ausnahme. Ein `fail-fast: false` steht nicht da.
+
+**SEC-022 ist hier eine Konvention, kein Gate.** `scripts/gen_tool_hashes.py`
+erzeugt `docs/tool-hashes.json`, aber **nichts prüft ihn**: kein CI-Schritt,
+kein Test. Die Anweisung steht nur in der README, als Handgriff beim Ändern
+der Protokollversion. Im Portfolio ist das die dritte Variante — `bag-health-mcp`
+fährt den Vergleich als CI-Schritt, `fedlex-mcp` als Test in der Suite, hier
+verlässt er sich auf Disziplin. Ein vergessenes Nachziehen fällt entsprechend
+nirgends auf.
 
 ### Live-Tests
 
