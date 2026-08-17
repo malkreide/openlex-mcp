@@ -34,6 +34,11 @@ jobs:
       # locally. Do not re-add a `pip install ruff==...` step: a second
       # declaration is what let the local and CI versions drift apart before.
       # `tests/test_toolchain_pin.py` fails if one reappears.
+      # Der Pin wirkt nur, wenn `ruff` ihn auch aufruft: liegt frueher im
+      # PATH ein anderes ruff, gewinnt jenes, und der Install meldet nichts.
+      - name: Ruff-Pin (PATH und Modul gegen pyproject.toml)
+        run: python scripts/check_ruff_pin.py
+
       - name: Lint
         run: ruff check src/ tests/ scripts/
 
