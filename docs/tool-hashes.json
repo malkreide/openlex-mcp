@@ -1,5 +1,5 @@
 {
-  "mcp_protocol_version": "2025-11-25",
+  "mcp_protocol_version": "2026-07-28",
   "tool_count": 8,
   "tools": {
     "openlex__zhlaw_find_education_laws": "0f0b2f3eeb02caea6d116a991723317ebf787ebac5f2fd5de806a2b77d26479e",

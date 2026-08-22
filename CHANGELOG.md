@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Browser-Clients scheiterten am Preflight.** Spec `2026-07-28` routet eine
+  Streamable-HTTP-Anfrage ueber `Mcp-Method`, `Mcp-Name` und
+  `Mcp-Protocol-Version`. Die Freigabeliste nannte davon nur den letzten — und
+  daneben `Mcp-Session-Id`, den Header genau der Session-Mechanik, die dieselbe
+  Revision abgeschafft hat. Ein Browser darf einen nicht safelisteten Header
+  nicht senden, wenn der Server ihn nicht nennt: die Anfrage starb vor dem
+  ersten MCP-Byte, waehrend stdio und Python weiterliefen.
+
+- **Der Protokoll-Pin nannte `2025-11-25`,** waehrend das gepinnte SDK
+  `2026-07-28` aushandelt. Aufgefallen ist es nicht, weil die einzige
+  Zusicherung auf diesen Wert seine Form prueft — zehn Zeichen, zwei
+  Bindestriche, was ein veraltetes Datum tadellos erfuellt.
+  `tests/test_protocol_version.py` haelt den Pin jetzt gegen
+  `LATEST_PROTOCOL_VERSION` aus dem SDK.
+
+- **Der Protokoll-Abschnitt der README nannte `mcp[cli] >= 1.3.0 (FastMCP)`** —
+  eine Anforderung von vor der Migration auf `mcp` 2.x, dazu ein SDK-Name, den
+  dieser Server nicht verwendet. `pyproject.toml` bindet auf
+  `mcp[cli]>=2.0.0,<3`.
+
+### Added
+
+- **Frischehinweise auf `tools/list` und `server/discover`** (SEP-2549, Spec
+  `2026-07-28`): `ttlMs` 300000, `cacheScope` `public`. Das SDK setzt sonst
+  «sofort veraltet, nie geteilt» und laesst damit jeden Client bei jeder
+  Verbindung neu auflisten — fuer eine Liste, die beim Import feststeht.
+  `prompts/list` und `resources/list` bleiben ungesetzt: dieser Server
+  registriert weder das eine noch das andere.
+
 ### Changed
 
 - **Drei Tests patchten eine Naht, die der Code nicht mehr benutzt.**

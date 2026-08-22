@@ -254,8 +254,9 @@ Before scaling beyond one instance: either add a shared session store **or** con
 
 | Item | Value |
 |------|-------|
-| **Supported protocol version** | `2025-11-25` |
-| **SDK** | `mcp[cli] >= 1.3.0` (FastMCP) |
+| **Supported protocol version** | `2026-07-28` |
+| **SDK** | `mcp[cli]>=2.0.0,<3` |
+| **Cache hints** | `tools/list` and `server/discover`: `ttlMs` 300000, `cacheScope` `public` |
 | **Pinned in** | `src/openlex_mcp/server.py` — `MCP_PROTOCOL_VERSION` constant |
 
 ### Update policy

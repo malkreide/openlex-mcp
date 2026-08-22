@@ -26,6 +26,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Literal, NoReturn
 
+from mcp.server.caching import CacheHint
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, Field
@@ -60,8 +61,15 @@ MAX_RESULTS_DEFAULT = 20
 MAX_RESULTS_LIMIT = 50
 
 # MCP protocol version this server is built and tested against (ARCH-012).
-# Update when the SDK is upgraded to a new protocol version.
-MCP_PROTOCOL_VERSION = "2025-11-25"
+#
+# This stood at "2025-11-25" while the pinned SDK (`mcp>=2.0.0,<3`) negotiated
+# "2026-07-28" — the constant claimed a revision the server had not spoken for
+# some time. Nothing caught it: the only assertion on this value checked its
+# *shape* (ten characters, two dashes), which a stale date satisfies perfectly.
+# `test_protocol_version.py` now holds it against the SDK's own
+# `LATEST_PROTOCOL_VERSION`, so the next drift is a failing build rather than a
+# line nobody re-reads.
+MCP_PROTOCOL_VERSION = "2026-07-28"
 
 # Bildungsrecht Ordnungsnummern-Prefix
 EDUCATION_SR_PREFIX = "412"
@@ -164,8 +172,30 @@ async def app_lifespan(server: MCPServer) -> AsyncIterator[AppContext]:
 # Server
 # ---------------------------------------------------------------------------
 
+# SEP-2549, Spec 2026-07-28: die auflistenden Methoden tragen `ttlMs` und
+# `cacheScope`. Das SDK setzt beides auf «sofort veraltet, nie geteilt» — ein
+# Server ohne `cache_hints` verhaelt sich also nicht neutral, sondern laesst
+# jeden Client bei jeder Verbindung neu auflisten, fuer Listen, die beim Import
+# feststehen und sich zur Laufzeit des Prozesses nicht aendern koennen.
+#
+# `public` folgt aus der Sache, nicht aus Bequemlichkeit: die 8 Tools werden
+# per Dekorator beim Import registriert, es gibt keine Filterung nach Aufrufer.
+# Sobald eine Liste vom Aufrufer abhaengt, muss der Scope im selben Commit auf
+# `private` wechseln.
+#
+# `prompts/list` und `resources/list` bleiben ungesetzt: dieser Server
+# registriert weder Prompts noch Ressourcen, und ein Hinweis darauf beschriebe
+# eine Flaeche, die es nicht gibt.
+LIST_CACHE_TTL_MS = 300_000
+
+CACHE_HINTS = {
+    "tools/list": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),
+    "server/discover": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),
+}
+
 mcp = MCPServer(
     "openlex_mcp",
+    cache_hints=CACHE_HINTS,
     instructions=(
         "MCP-Server für die Zürcher Gesetzessammlung (ZH-Lex / Kanton Zürich). "
         "Volltextsuche in ~970 kantonalen Gesetzen, Artikel-Extraktion, "
@@ -1106,6 +1136,18 @@ def build_transport_security(host: str, port: int):
     )
 
 
+# Die Header, nach denen Spec 2026-07-28 eine Streamable-HTTP-Anfrage routet —
+# in der Schreibweise des SDK (`mcp.shared.inbound`). Ein Browser darf einen
+# nicht safelisteten Header gar nicht erst senden, wenn der Server ihn nicht in
+# `Access-Control-Allow-Headers` nennt: ohne sie stirbt jede Cross-Origin-
+# Anfrage am Preflight, vor dem ersten MCP-Byte. stdio- und Python-Clients
+# kennen keinen Preflight und merken davon nichts — deshalb fiel es nicht auf.
+#
+# `Mcp-Param-*` fehlt bewusst: CORS kennt keinen Praefix-Wildcard, und kein
+# Tool-Schema dieses Servers traegt eine `x-mcp-header`-Annotation.
+CORS_ROUTING_HEADERS = ["Mcp-Method", "Mcp-Name", "Mcp-Protocol-Version"]
+
+
 def _build_http_app(host: str = "127.0.0.1", port: int = 8000):
     """Baut die Streamable-HTTP-App inklusive CORS (SDK-004).
 
@@ -1140,9 +1182,9 @@ def _build_http_app(host: str = "127.0.0.1", port: int = 8000):
         allow_headers=[
             "Content-Type",
             "Authorization",
+            *CORS_ROUTING_HEADERS,
             "Mcp-Session-Id",
             "Last-Event-ID",
-            "MCP-Protocol-Version",
         ],
         expose_headers=["Mcp-Session-Id"],
     )
