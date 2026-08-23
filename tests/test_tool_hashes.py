@@ -84,6 +84,39 @@ def test_die_werkzeugzahl_im_schnappschuss_stimmt(aktuell, schnappschuss) -> Non
     assert schnappschuss["tool_count"] == len(aktuell) == len(schnappschuss["tools"])
 
 
+def test_der_hash_ist_unabhaengig_vom_docstring_einzug() -> None:
+    """Python 3.13 dedentiert Docstrings beim Kompilieren, 3.11 nicht.
+
+    Derselbe Quelltext liefert dort eine Beschreibung mit vier Leerzeichen
+    Einzug auf jeder Folgezeile und hier eine ohne. Gemessen an diesem Server:
+    **null von acht** Hashes stimmten zwischen 3.11 und 3.13 überein, während
+    Eingabe- und Ausgabeschema Zeichen für Zeichen identisch waren.
+
+    Aufgefallen ist das nicht lokal — der Container fährt 3.11 —, sondern in der
+    CI-Matrix, die zusätzlich 3.12 und 3.13 fährt. Ein Schnappschuss, der auf
+    einem Feld immer rot ist, wäre schlimmer als keiner: er wird abgeschaltet.
+
+    Normalisiert wird ausschliesslich der Einzug. Der zweite Fall unten zeigt,
+    dass eine echte Umformulierung den Hash weiterhin ändert.
+    """
+    skript = _skript()
+
+    class Attrappe:
+        def __init__(self, description):
+            self.name = "x"
+            self.description = description
+            self.input_schema = {"type": "object"}
+            self.output_schema = None
+
+    wie_311 = "Erste Zeile.\n\n    Zweite Zeile mit Einzug.\n    Dritte Zeile."
+    wie_313 = "Erste Zeile.\n\nZweite Zeile mit Einzug.\nDritte Zeile."
+    assert skript._tool_hash(Attrappe(wie_311)) == skript._tool_hash(Attrappe(wie_313))
+
+    # Gegenkontrolle: normalisiert wird der Einzug, nicht der Inhalt.
+    umformuliert = "Erste Zeile.\n\nZweite Zeile mit Einzug.\nVierte Zeile."
+    assert skript._tool_hash(Attrappe(wie_313)) != skript._tool_hash(Attrappe(umformuliert))
+
+
 def test_der_hash_liest_den_vertrag_und_nicht_die_sdk_interna(aktuell) -> None:
     """Warum die Nutzlast auf `inputSchema`/`outputSchema` steht.
 

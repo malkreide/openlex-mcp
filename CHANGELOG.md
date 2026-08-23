@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   die acht Werkzeuge selbst sind unverändert (Namen, Beschreibungen und
   Pflichtfelder im PR-Text aufgeführt).
 
+- **Der Hash war ausserdem von der Python-Version abhängig.** 3.13 dedentiert
+  Docstrings beim Kompilieren, ältere Versionen nicht: derselbe Quelltext
+  liefert dort eine Beschreibung, deren Folgezeilen vier Leerzeichen Einzug
+  tragen, und hier eine ohne. Gemessen 3.11 gegen 3.13: **null von acht** Hashes
+  stimmten überein, während Eingabe- und Ausgabeschema Zeichen für Zeichen
+  identisch waren. Die Nutzlast normalisiert die Beschreibung deshalb mit
+  `inspect.cleandoc`. Eine echte Umformulierung ändert den Hash weiterhin —
+  `test_der_hash_ist_unabhaengig_vom_docstring_einzug` prüft beide Richtungen.
+
 ### Added
 
 - **`tests/test_tool_hashes.py` macht SEC-022 zu einem Gate.** Bisher erzeugte

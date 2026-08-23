@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
+import inspect
 import json
 import sys
 from pathlib import Path
@@ -46,10 +47,22 @@ SNAPSHOT = Path(__file__).resolve().parent.parent / "docs" / "tool-hashes.json"
 
 
 def _tool_hash(tool) -> str:
-    """Stabiler SHA-256 ueber den beobachtbaren Vertrag eines Werkzeugs."""
+    """Stabiler SHA-256 ueber den beobachtbaren Vertrag eines Werkzeugs.
+
+    `inspect.cleandoc` statt `.strip()`: Python 3.13 dedentiert Docstrings beim
+    Kompilieren, aeltere Versionen nicht. Derselbe Quelltext liefert dort also
+    eine Beschreibung, deren Folgezeilen vier Leerzeichen Einzug tragen, und
+    hier eine ohne — gemessen an 3.11 gegen 3.13: **null von acht** Hashes
+    stimmten ueberein, waehrend Eingabe- und Ausgabeschema Zeichen fuer Zeichen
+    identisch waren. Die CI-Matrix faehrt beide Versionen, ein roher Hash waere
+    dort also auf einem Feld immer rot.
+
+    Normalisiert wird nur der Einzug, den der Interpreter zufuegt oder wegnimmt.
+    Eine echte Umformulierung aendert den Hash weiterhin — das ist der Zweck.
+    """
     payload = {
         "name": tool.name,
-        "description": (tool.description or "").strip(),
+        "description": inspect.cleandoc(tool.description or ""),
         "inputSchema": tool.input_schema,
         "outputSchema": getattr(tool, "output_schema", None),
     }
