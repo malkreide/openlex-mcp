@@ -263,7 +263,7 @@ Vor der Skalierung über eine Instanz hinaus: entweder einen geteilten Session-S
 ### Update-Politik
 
 1. Wird `mcp` aktualisiert (via Dependabot-PR), die Protokollversion in den SDK-Release-Notes prüfen.
-2. Ändert sich die Protokollversion, `MCP_PROTOCOL_VERSION` in `server.py` aktualisieren, `docs/tool-hashes.json` neu generieren (`PYTHONPATH=src python scripts/gen_tool_hashes.py > docs/tool-hashes.json`) und die Änderung in `CHANGELOG.md` vermerken.
+2. Ändert sich die Protokollversion, `MCP_PROTOCOL_VERSION` in `server.py` aktualisieren, `docs/tool-hashes.json` neu generieren (`PYTHONPATH=src python scripts/gen_tool_hashes.py --write`) und die Änderung in `CHANGELOG.md` vermerken.
 3. Vor dem Merge `pytest tests/ -m "not live"` ausführen, um die Kompatibilität zu bestätigen.
 
 ---
