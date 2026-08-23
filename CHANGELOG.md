@@ -38,6 +38,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `prompts/list` und `resources/list` bleiben ungesetzt: dieser Server
   registriert weder das eine noch das andere.
 
+- **Der Protokoll-Pin sicherte nur eine der beiden Spec-Aeren.** `mcp` 2.x
+  bedient zwei ueber denselben Server; die erste Anfrage einer Verbindung
+  entscheidet, welche gilt: der `initialize`-Handshake deckelt bei
+  `2025-11-25`, der Pro-Request-Envelope erreicht `2026-07-28`.
+
+  Die bisherige Zusicherung lautete `PIN == LATEST_PROTOCOL_VERSION` und las
+  sich vollstaendig. `LATEST_PROTOCOL_VERSION` ist aber ein Alias auf die
+  MODERNE Aera — gesichert war damit die Aera, in der heute praktisch niemand
+  spricht, waehrend die andere frei wandern konnte. Man sieht es dem
+  Konstantennamen nicht an.
+
+  **Der Wert der Konstante aendert sich nicht.** Er war richtig, nur
+  unvollstaendig beschrieben. Neu steht er gegen `LATEST_MODERN_VERSION` —
+  dieselbe Zahl, aber die Aera ist benannt —, die Handshake-Obergrenze bekommt
+  eine eigene Zusicherung, und ein dritter Test haelt die Alias-Eigenschaft
+  fest, damit die Falle beim naechsten Lesen benannt dasteht.
+
+  Ohne gemessenen Teil: dieser Server baut keine ASGI-App, durch die sich ein
+  `initialize` schicken liesse. Die Aushandlung steht in
+  `mcp/server/runner.py::_negotiate_initialize` und haengt an keinem Transport
+  — an neun Schwester-Servern gemessen, hier an den SDK-Konstanten gehalten.
+
+  **README.de.md stand drei Revisionen hinter README.md** und nannte dazu
+  `mcp[cli] >= 1.3.0 (FastMCP)` — eine Anforderung von vor der Migration auf
+  `mcp` 2.x, mit einem SDK-Namen, den dieser Server nicht verwendet. Die
+  englische Fassung war beim letzten Mal nachgezogen worden, die deutsche
+  nicht. Der Test, der die SDK-Anforderung gegen `pyproject.toml` haelt, prueft
+  jetzt beide Sprachen.
+
 ### Changed
 
 - **Drei Tests patchten eine Naht, die der Code nicht mehr benutzt.**

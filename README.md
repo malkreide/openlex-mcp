@@ -254,7 +254,9 @@ Before scaling beyond one instance: either add a shared session store **or** con
 
 | Item | Value |
 |------|-------|
-| **Supported protocol version** | `2026-07-28` |
+| **Served via the `initialize` handshake** | `2024-11-05` … **`2025-11-25`** — the handshake ceiling |
+| **Served via the per-request envelope** | **`2026-07-28`** |
+| **Who picks** | The client's first request, once per connection. A request carrying the `2026-07-28` `_meta` envelope opens a modern connection; anything else opens a handshake connection. |
 | **SDK** | `mcp[cli]>=2.0.0,<3` |
 | **Cache hints** | `tools/list` and `server/discover`: `ttlMs` 300000, `cacheScope` `public` |
 | **Pinned in** | `src/openlex_mcp/server.py` — `MCP_PROTOCOL_VERSION` constant |

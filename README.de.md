@@ -254,8 +254,10 @@ Vor der Skalierung über eine Instanz hinaus: entweder einen geteilten Session-S
 
 | Element | Wert |
 |---------|------|
-| **Unterstützte Protokollversion** | `2025-11-25` |
-| **SDK** | `mcp[cli] >= 1.3.0` (FastMCP) |
+| **Über den `initialize`-Handshake bedient** | `2024-11-05` … **`2025-11-25`** — die Handshake-Obergrenze |
+| **Über den Pro-Request-Envelope bedient** | **`2026-07-28`** |
+| **Wer entscheidet** | Die erste Anfrage des Clients, einmal pro Verbindung. Eine Anfrage mit dem `2026-07-28`-`_meta`-Envelope öffnet eine moderne Verbindung, alles andere eine Handshake-Verbindung. |
+| **SDK** | `mcp[cli]>=2.0.0,<3` |
 | **Verankert in** | `src/openlex_mcp/server.py` — Konstante `MCP_PROTOCOL_VERSION` |
 
 ### Update-Politik
