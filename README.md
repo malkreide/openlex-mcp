@@ -264,7 +264,7 @@ Before scaling beyond one instance: either add a shared session store **or** con
 ### Update policy
 
 1. When `mcp` is upgraded (via Dependabot PR), verify the protocol version in the SDK release notes.
-2. If the protocol version changes, update `MCP_PROTOCOL_VERSION` in `server.py`, regenerate `docs/tool-hashes.json` (`PYTHONPATH=src python scripts/gen_tool_hashes.py > docs/tool-hashes.json`), and note the change in `CHANGELOG.md`.
+2. If the protocol version changes, update `MCP_PROTOCOL_VERSION` in `server.py`, regenerate `docs/tool-hashes.json` (`PYTHONPATH=src python scripts/gen_tool_hashes.py --write`), and note the change in `CHANGELOG.md`.
 3. Run `pytest tests/ -m "not live"` to confirm compatibility before merging.
 
 ---

@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Der Tool-Hash-Schnappschuss hashte SDK-Interna statt des Vertrags.**
+  `scripts/gen_tool_hashes.py` las `mcp._tool_manager._tools` und hashte dort
+  das Attribut `parameters`. Dasselbe Werkzeug hat über die öffentliche Liste
+  gar kein `parameters`, sondern `input_schema` — es sind zwei verschiedene
+  Objekte. Als die 2.x-Migration die Interna umbaute, änderten sich deshalb
+  **alle acht** Hashes, obwohl seit der letzten Erzeugung kein einziger Commit
+  `server.py` angefasst hatte.
+
+  Das Skript liest jetzt `await mcp.list_tools()` und stellt die Nutzlast auf
+  die Wire-Namen `inputSchema`/`outputSchema` — gebunden an das, was Clients
+  über das Protokoll sehen, nicht an die Schreibweise des SDK. Dieselbe Lösung
+  fährt `bag-health-mcp`. Der Schnappschuss ist damit einmal neu geschrieben;
+  die acht Werkzeuge selbst sind unverändert (Namen, Beschreibungen und
+  Pflichtfelder im PR-Text aufgeführt).
+
+- **Der Hash war ausserdem von der Python-Version abhängig.** 3.13 dedentiert
+  Docstrings beim Kompilieren, ältere Versionen nicht: derselbe Quelltext
+  liefert dort eine Beschreibung, deren Folgezeilen vier Leerzeichen Einzug
+  tragen, und hier eine ohne. Gemessen 3.11 gegen 3.13: **null von acht** Hashes
+  stimmten überein, während Eingabe- und Ausgabeschema Zeichen für Zeichen
+  identisch waren. Die Nutzlast normalisiert die Beschreibung deshalb mit
+  `inspect.cleandoc`. Eine echte Umformulierung ändert den Hash weiterhin —
+  `test_der_hash_ist_unabhaengig_vom_docstring_einzug` prüft beide Richtungen.
+
+### Added
+
+- **`tests/test_tool_hashes.py` macht SEC-022 zu einem Gate.** Bisher erzeugte
+  das Skript den Schnappschuss, aber nichts verglich ihn: kein CI-Schritt, kein
+  Test. Die Anweisung stand allein in der README. Genau deshalb blieb die Drift
+  zwei Tage unbemerkt — ein Schnappschuss, den niemand vergleicht, schützt vor
+  nichts, er sieht nur so aus.
+
+- **`--check` / `--write` / `--print` für `scripts/gen_tool_hashes.py`.** Der
+  Aufruf mit Umleitung (`… > docs/tool-hashes.json`) entfällt; beide READMEs
+  nennen jetzt `--write`.
+
+### Fixed
+
 - **Browser-Clients scheiterten am Preflight.** Spec `2026-07-28` routet eine
   Streamable-HTTP-Anfrage ueber `Mcp-Method`, `Mcp-Name` und
   `Mcp-Protocol-Version`. Die Freigabeliste nannte davon nur den letzten — und

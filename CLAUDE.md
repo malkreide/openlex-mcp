@@ -218,13 +218,25 @@ python scripts/check_version_sync.py
 Matrix: Python 3.11 / 3.12 / 3.13; alle Gates laufen auf allen drei Feldern,
 keine `if:`-Ausnahme. Ein `fail-fast: false` steht nicht da.
 
-**SEC-022 ist hier eine Konvention, kein Gate.** `scripts/gen_tool_hashes.py`
-erzeugt `docs/tool-hashes.json`, aber **nichts prüft ihn**: kein CI-Schritt,
-kein Test. Die Anweisung steht nur in der README, als Handgriff beim Ändern
-der Protokollversion. Im Portfolio ist das die dritte Variante — `bag-health-mcp`
-fährt den Vergleich als CI-Schritt, `fedlex-mcp` als Test in der Suite, hier
-verlässt er sich auf Disziplin. Ein vergessenes Nachziehen fällt entsprechend
-nirgends auf.
+**SEC-022 ist jetzt ein Gate.** `tests/test_tool_hashes.py` vergleicht
+`docs/tool-hashes.json` mit den aktuellen Definitionen; die Suite läuft in der
+CI, also fällt ein vergessenes Nachziehen auf. `scripts/gen_tool_hashes.py`
+kann beides: `--check` (Standard) und `--write` nach einer gewollten Änderung.
+
+Der Absatz stand hier zwei Tage lang anders — «eine Konvention, kein Gate», und
+das traf zu. Was er beschrieb, ist genau eingetreten: Der Schnappschuss war acht
+Hashes weit veraltet, ohne dass ein Lauf rot wurde. Die Ursache lag nicht bei
+jemandem, der das Nachziehen vergessen hat, sondern in der Hash-Eingabe — das
+alte Skript las `mcp._tool_manager._tools` und hashte dort `parameters`. Über
+die öffentliche Liste heisst dasselbe Feld `input_schema`; es sind zwei
+verschiedene Objekte. Die 2.x-Migration baute die Interna um, und damit
+änderten sich alle acht Hashes, obwohl seit der letzten Erzeugung kein einziger
+Commit `server.py` angefasst hatte.
+
+Die Nutzlast steht deshalb auf den Wire-Namen `inputSchema`/`outputSchema` —
+gebunden an das, was Clients über das Protokoll sehen, nicht an die
+SDK-Schreibweise. Dieselbe Lösung fährt `bag-health-mcp`, dort als CI-Schritt
+statt als Test.
 
 ### Live-Tests
 
