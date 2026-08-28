@@ -236,6 +236,7 @@ python scripts/check_ruff_pin.py
 ruff check src/ tests/ scripts/
 ruff format --check src/ tests/ scripts/
 python scripts/check_version_sync.py
+python scripts/check_dependabot_labels.py     # braucht GH_TOKEN, siehe unten
 ```
 
 Matrix: Python 3.11 / 3.12 / 3.13; alle Gates laufen auf allen drei Feldern,
@@ -260,6 +261,43 @@ Die Nutzlast steht deshalb auf den Wire-Namen `inputSchema`/`outputSchema` —
 gebunden an das, was Clients über das Protokoll sehen, nicht an die
 SDK-Schreibweise. Dieselbe Lösung fährt `bag-health-mcp`, dort als CI-Schritt
 statt als Test.
+
+### Ein Label, das nur in der Konfiguration existiert
+
+`dependabot.yml` verlangt unter `labels:` ein Label. Fehlt es im Repo, legt
+Dependabot es **nicht** an — es kommentiert an jedem erzeugten PR:
+
+```
+The following labels could not be found: `dependencies`.
+```
+
+Der PR entsteht trotzdem, die CI bleibt grün, und die Meldung sieht aus wie
+Rauschen. Am 28.8.2026 verlangten 24 Repos des Portfolios zusammen 50 Labels,
+und **alle 50 fehlten** — einzeln mit `get_label` nachgemessen, mit drei
+Positivkontrollen (`bug`, `enhancement`, `documentation` lieferten echte
+Objekte, «not found» war also eine Messung und kein Werkzeugartefakt).
+Aufgefallen ist es an einem Bot-Kommentar unter einem Dependabot-PR.
+
+`scripts/check_dependabot_labels.py` macht daraus ein Gate: es liest die eigene
+`dependabot.yml`, holt die Labels des Repos über die API und fällt, wenn eines
+fehlt. Der Standard-`GITHUB_TOKEN` genügt; der Job braucht dafür `issues: read`,
+deshalb steht in `ci.yml` jetzt ein `permissions:`-Block.
+
+**Ohne Token wird nichts still grün.** In der CI (`CI` gesetzt) ist ein
+fehlender Token ein Fehler. Ein Überspringen sähe in der Ausgabe genauso aus wie
+ein Erfolg — das wäre wieder der Schnappschuss, den niemand vergleicht.
+`tests/test_dependabot_labels.py` hält beide Richtungen fest, dazu die
+Extraktion: Block- und Inline-Form, und der Abbruch an der Einrückung. Ohne den
+läse der Parser über die Blockgrenze hinaus und meldete
+`package-ecosystem: "github-actions"` als fehlendes Label — ein dauerhaft rotes
+Gate, das jemand abschaltet.
+
+Der Check ist bewusst Standardbibliothek und ohne YAML-Parser, damit er zwischen
+den Repos kopierbar bleibt (fünf fahren ihre CI auch auf 3.10). Die Extraktion
+ist gegen alle 31 echten `dependabot.yml` des Portfolios gegengeprüft.
+
+Wo Labels fehlen, legt `labels-sync.py` sie an — es leitet sie aus jeder
+`dependabot.yml` ab, statt eine Liste zu pflegen, die still veraltet.
 
 ### Live-Tests
 

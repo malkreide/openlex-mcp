@@ -9,6 +9,12 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # `issues: read` braucht der Dependabot-Label-Check unten — die Label-API
+    # haengt an diesem Scope. `contents: read` ist der Checkout. Mehr braucht
+    # dieser Job nicht, und ohne Block erbte er die Repo-Vorgabe.
+    permissions:
+      contents: read
+      issues: read
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
@@ -47,3 +53,12 @@ jobs:
 
       - name: Versions-Sync (pyproject ↔ server.json / README / src)
         run: python scripts/check_version_sync.py
+
+      # Dependabot legt ein Label nicht an, das in dependabot.yml steht und im
+      # Repo fehlt — es kommentiert nur an jedem PR. Das faellt sonst nirgends
+      # auf. Der Token ist der Standard-GITHUB_TOKEN; ohne ihn faellt der Check
+      # hier absichtlich, statt still zu ueberspringen.
+      - name: Dependabot-Labels (Deklaration ↔ Repo)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/check_dependabot_labels.py
