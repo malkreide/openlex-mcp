@@ -295,7 +295,7 @@ auf Loopback, und der Verkehr verliess den Rechner trotzdem.
 
 ### Der ruff-Pin steht in `pyproject.toml`
 
-Und nur dort — `[project.optional-dependencies].dev` sagt `ruff==0.16.3`, die
+Und nur dort — `[project.optional-dependencies].dev` sagt `ruff==0.16.4`, die
 CI installiert ihn über `pip install -e ".[dev]"` mit. Keinen zweiten Pin in
 einen Workflow schreiben: Vorher stand `ruff==0.16.1` allein in `ci.yml`,
 während `pyproject.toml` `ruff>=0.4.0` sagte — eine frische venv zog damit
