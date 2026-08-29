@@ -136,9 +136,25 @@ def test_die_eigene_konfiguration_verlangt_genau_dependencies(skript) -> None:
     Handgeschriebene Beispiele kodieren die Annahme des Autors. Diese Zusicherung
     faellt, sobald jemand die Labels dieses Repos aendert, ohne den Check
     mitzudenken.
+
+    Am 29.8.2026 ist sie genau dafuer gefallen: ein PR nahm beide
+    `labels:`-Bloecke aus `dependabot.yml`, weil das Label im Repo gefehlt hatte.
+    Inzwischen existiert es — der Schnitt haette das Gate entschaerft, statt ein
+    Problem zu loesen. Im CI-Log stand davon nichts, nur `assert set() ==
+    {'dependencies'}`. Eine Stolperschnur, die ihren Grund nicht nennt, kostet
+    den naechsten Leser genau die Recherche, die sie ersparen soll; deshalb
+    traegt die Zusicherung ihn jetzt selbst.
     """
     text = (_ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8")
-    assert skript.declared_labels(text) == {"dependencies"}
+    gefunden = skript.declared_labels(text)
+    assert gefunden == {"dependencies"}, (
+        f"dependabot.yml verlangt {sorted(gefunden) or 'keine Labels'}, erwartet "
+        "ist genau 'dependencies'. Wer den `labels:`-Block aendert, aendert "
+        "damit, was scripts/check_dependabot_labels.py in der CI noch prueft — "
+        "ohne Block prueft es gar nichts mehr und meldet das als Erfolg. "
+        "Gewollt: diese Zusicherung im selben PR mitziehen. Nicht gewollt: der "
+        "Block gehoert zurueck nach .github/dependabot.yml."
+    )
 
 
 def test_ein_fehlendes_label_macht_den_lauf_rot(skript, monkeypatch, capsys) -> None:
