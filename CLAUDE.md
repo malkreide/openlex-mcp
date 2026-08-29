@@ -44,6 +44,32 @@ Handgeschriebene Fixtures kodieren die Annahme des Autors und können sie
 nicht widerlegen. Mindestens eine aufgezeichnete Antwort pro externem
 Endpunkt, mit Aufnahmedatum.
 
+**Eine Stolperschnur kodiert die Annahme nicht nur, sie verteidigt sie.** Am
+29.8.2026 pinnte `test_die_eigene_konfiguration_verlangt_genau_dependencies`
+die `labels:`-Deklaration dieses Repos auf `{"dependencies"}`. Gebaut wurde er,
+weil ein PR die Deklaration entfernt hatte und der Schnitt gegenstandslos
+schien: das Label existiert ja. Es existiert aber, *weil* Dependabot die
+Vorgabe anlegt — der Abschnitt «die Vorgabe lesen» weiter unten rechnet es
+durch. Der Test hielt damit den falschen Zustand fest.
+
+Gegen ein Fixture ist das die schärfere Sorte Fehler. Eine Attrappe schweigt zu
+der Annahme, die sie kodiert; ein Gate widerspricht. Wer die Deklaration danach
+richtig entfernte, wurde rot — und die Meldung, die ich absichtlich sprechend
+geschrieben hatte, schickte ihn zurück:
+
+```
+Nicht gewollt: der Block gehoert zurueck nach .github/dependabot.yml.
+```
+
+Je besser die Fehlermeldung, desto teurer die falsche Prämisse dahinter.
+
+Vor jeder Stolperschnur deshalb nicht fragen, ob der Test den aktuellen Zustand
+festhält — das tut er per Konstruktion —, sondern ob dieser Zustand **unabhängig
+von dem belegt ist, was ihn erzeugt hat**. Hier war er es nicht: Das gefundene
+Label war kein Zeuge, sondern ein Erzeugnis genau des Mechanismus, über den es
+Auskunft geben sollte. Dieselbe Figur wie die Fake-Uhr oben, nur eine Ebene
+höher.
+
 ### Wenn etwas rot ist
 
 Roter Live-Test: erst die Quelle abfragen, dann einordnen. Nicht aus der
