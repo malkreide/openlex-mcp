@@ -199,7 +199,8 @@ ohne dass jemand hineingesehen hat, und am 22.8. noch einmal 43.
   «More of your lovely PRs please.»); stabil ist nur der Satz davor. Der
   Infokasten, den Codex unter jeden Review setzt, behauptet weiterhin eine
   Reaktion («otherwise it will react with 👍») — am 23.8. kam in sechs Repos
-  die Meldung und in keinem die Reaktion. Der Kasten ist keine Quelle.
+  die Meldung und in keinem die Reaktion. Der Kasten war damit keine Quelle;
+  wie belastbar dieser Befund ist, steht am Ende des Abschnitts.
 - **Der PR ist ein Draft** — darauf läuft Codex nicht an.
 - **Das Kontingent ist weg** — dann schreibt er die Meldung oben.
 - **Für das Repo fehlt eine Environment** — dann schreibt er:
@@ -220,7 +221,8 @@ Vermutung über die Reihenfolge.
 Praktisch heisst das: **Eine verschwundene Limit-Meldung ist keine Entwarnung.**
 Sie kann bedeuten, dass das Kontingent wieder da ist — und dass jetzt etwas
 anderes den Review verhindert. Belegt ist eine Prüfung erst durch ein
-Review-Objekt **oder** eine Befundlos-Meldung. Wer nur das Objekt gelten lässt,
+Review-Objekt, eine Befundlos-Meldung **oder** den Statuskommentar weiter unten.
+Wer nur das Objekt gelten lässt,
 zählt jeden befundlosen Review als ungeprüft — und baut sich denselben Fehlalarm
 ein, den dieser Abschnitt verhindern soll, nur in die andere Richtung.
 
@@ -237,12 +239,65 @@ alles andere; wer nur eine nimmt, übersieht den Rest. Genau so ist die
 Limit-Meldung zuerst durchgerutscht.
 
 Der Kommentarzähler allein reicht ohnehin nicht: `comments: 1` kann die
-Befundlos-, die Kontingent- **oder** die Environment-Meldung sein — drei
-gegensätzliche Bedeutungen unter derselben Zahl. Den Text lesen, nicht die Zahl.
-Und einen unbekannten vierten Text wörtlich zitieren, statt ihn in eine der
-bekannten Schubladen zu zwingen: Dieser Abschnitt musste schon einmal von drei
-auf vier Gründe wachsen, und die 👍-Reaktion stand hier zwei Fassungen lang als
-Tatsache.
+Befundlos-, die Kontingent-, die Environment-Meldung **oder** den
+Statuskommentar sein — vier gegensätzliche Bedeutungen unter derselben Zahl, und
+die letzte wechselt ihre eigene noch, während sie dasteht. Den Text lesen, nicht
+die Zahl. Und einen unbekannten Text wörtlich zitieren, statt ihn in eine der
+bekannten Schubladen zu zwingen: Dieser Abschnitt musste schon zweimal wachsen —
+erst von drei auf vier Gründe, dann um die Form unten —, und die 👍-Reaktion
+stand hier zwei Fassungen lang als Tatsache.
+
+**Es gibt eine fünfte Form, und sie ist die einzige, die den Lauf selbst
+datiert.** Am 29.8.2026 wurde in diesem Repo PR #77 von Draft auf ready
+gestellt. Um 12:20:56.72Z begann daraufhin ein Lauf, und um 12:21:00Z stand
+darunter ein gewöhnlicher Issue-Kommentar von `chatgpt-codex-connector[bot]`,
+erkennbar am verborgenen Marker `<!-- codex-pull-request-review-summary -->`:
+
+```
+## Codex Review Summary
+
+| Review         | Status                       | Commit    | Review trigger     |
+| -------------- | ---------------------------- | --------- | ------------------ |
+| 📝 Code Review | 🔄 Running since 12:20:56.72Z | `8273d03` | Draft marked ready |
+```
+
+Um 12:22:28.07Z wurde derselbe Kommentar **an Ort und Stelle** überschrieben:
+aus `🔄 Running` wurde `✅ Completed`. `get_reviews` blieb dabei `[]`, und eine
+Befundlos-Meldung kam nie.
+
+Nach der Regel, wie sie hier bis heute stand, wäre dieser PR damit **ungeprüft**
+gewesen — es gab weder ein Review-Objekt noch eine Befundlos-Meldung. Gelaufen
+ist der Review trotzdem, mit Zeitstempel, Commit und Auslöser. Die Regel hätte
+also in genau die Richtung geirrt, vor der sie warnt, nur einen Schritt weiter.
+
+Drei Dinge, die man dabei auseinanderhalten muss:
+
+- **Der Statuskommentar belegt den Lauf, nicht das Urteil.** `✅ Completed` heisst
+  «fertig», nicht «sauber». Ob es Befunde gab, sagt weiterhin allein, ob ein
+  Review-Objekt dasteht. Wer sein Häkchen an das grüne Symbol hängt, hängt es an
+  die falsche Aussage.
+- **Er wird überschrieben, nicht ergänzt.** Dieselbe Kommentar-ID bedeutete
+  binnen anderthalb Minuten erst «läuft» und dann «fertig». Was man vorhin
+  gelesen hat, ist deshalb kein Befund, sondern ein Zwischenstand — vor dem
+  Urteil neu abfragen.
+- **Eine Beobachtung ist keine Regel.** Belegt ist diese Form für ein Repo, einen
+  PR, einen Tag. Ob jedes Repo sie bekommt, ist offen; ihr Fehlen ist vorerst
+  kein Gegenbeweis, und ein Repo ohne sie fällt zurück auf die vier Fälle oben.
+
+Der Infokasten wurde derweil umgeschrieben und verspricht jetzt zwei Reaktionen:
+👀 während des Laufs, 👍 nach einem Lauf ohne Befund. Und diesmal war eine da:
+der PR trug am Ende `reactions: {"+1": 1}`. Das ist der erste Beleg überhaupt
+dafür, und er trägt nur bis zu einer Grenze — wer sie gesetzt hat, sagt die
+Antwort nicht; ein Daumen des Autors sieht in `reactions` genauso aus. Der
+Kasten ist damit nicht bestätigt, nur nicht mehr widerlegt.
+
+**Die Reaktion sitzt am PR, nicht am Statuskommentar.** Daran bin ich selbst
+hängengeblieben: `reactions` am Kommentar liefert `total_count: 0`, und das
+sieht aus wie ein Ausbleiben. Es ist aber keine Messung des Versprechens,
+sondern eine Messung am falschen Objekt — und stand deshalb zwei Stunden lang
+falsch in der Beschreibung von #77. Ob die sechs Beobachtungen vom 23.8. am PR
+oder am Kommentar entstanden sind, geht aus dem Eintrag oben nicht hervor; bevor
+jemand «der Kasten ist keine Quelle» weiterträgt, gehört das nachgemessen.
 
 Und ein befundloser Lauf ist kein Freispruch. Am 23.8. lief derselbe Text durch
 42 Reviews: 36 meldeten denselben P2-Befund, 6 die Befundlos-Meldung — gleiche
