@@ -130,30 +130,38 @@ def test_ohne_labels_block_wird_nichts_verlangt(skript) -> None:
     assert skript.declared_labels(OHNE) == set()
 
 
-def test_die_eigene_konfiguration_verlangt_genau_dependencies(skript) -> None:
+def test_die_eigene_konfiguration_deklariert_keine_labels(skript) -> None:
     """Verankert den Parser an der echten Datei, nicht nur an Attrappen.
 
     Handgeschriebene Beispiele kodieren die Annahme des Autors. Diese Zusicherung
     faellt, sobald jemand die Labels dieses Repos aendert, ohne den Check
     mitzudenken.
 
-    Am 29.8.2026 ist sie genau dafuer gefallen: ein PR nahm beide
-    `labels:`-Bloecke aus `dependabot.yml`, weil das Label im Repo gefehlt hatte.
-    Inzwischen existiert es — der Schnitt haette das Gate entschaerft, statt ein
-    Problem zu loesen. Im CI-Log stand davon nichts, nur `assert set() ==
-    {'dependencies'}`. Eine Stolperschnur, die ihren Grund nicht nennt, kostet
-    den naechsten Leser genau die Recherche, die sie ersparen soll; deshalb
-    traegt die Zusicherung ihn jetzt selbst.
+    Am 29.8.2026 ist sie zweimal gefallen, und beim ersten Mal wurde der falsche
+    Schluss gezogen. Ein PR nahm beide `labels:`-Bloecke heraus; weil das Label
+    `dependencies` im Repo existierte, galt der Schnitt als gegenstandslos und
+    der PR wurde geschlossen. Die Optionsreferenz kehrt das um: ohne `labels:`
+    vergibt Dependabot `dependencies` plus ein Oekosystem-Label und *legt beide
+    selbst an*; eine eigene Liste wird «used instead of the default labels».
+    Das Label existierte also, WEIL Dependabot es anlegt — und die Deklaration
+    ersetzte einen sich selbst pflegenden Satz durch eine starre Ein-Element-
+    Liste. Dieses Repo fuehrt zwei Oekosysteme und verlor damit das
+    Oekosystem-Label: `github-actions` und `github_actions` fehlen beide
+    (nachgemessen am 29.8.2026, Kontrolle `bug` vorhanden).
+
+    Deshalb steht hier jetzt die leere Menge. Als Stolperschnur taugt sie
+    unveraendert: sie faellt, sobald jemand wieder Labels deklariert.
     """
     text = (_ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8")
     gefunden = skript.declared_labels(text)
-    assert gefunden == {"dependencies"}, (
-        f"dependabot.yml verlangt {sorted(gefunden) or 'keine Labels'}, erwartet "
-        "ist genau 'dependencies'. Wer den `labels:`-Block aendert, aendert "
-        "damit, was scripts/check_dependabot_labels.py in der CI noch prueft — "
-        "ohne Block prueft es gar nichts mehr und meldet das als Erfolg. "
-        "Gewollt: diese Zusicherung im selben PR mitziehen. Nicht gewollt: der "
-        "Block gehoert zurueck nach .github/dependabot.yml."
+    assert gefunden == set(), (
+        f"dependabot.yml deklariert {sorted(gefunden)}, erwartet ist keine "
+        "Deklaration. Ohne `labels:` vergibt Dependabot `dependencies` plus ein "
+        "Oekosystem-Label und legt beide selbst an; eine eigene Liste ERSETZT "
+        "diesen Satz und laesst unbekannte Namen stillschweigend fallen. Wer "
+        "hier wieder deklariert, tauscht also Automatik gegen Handarbeit — "
+        "gewollt nur, wenn die Namen im Repo wirklich gepflegt werden (so wie "
+        "in register-mcp). Dann diese Zusicherung im selben PR mitziehen."
     )
 
 
