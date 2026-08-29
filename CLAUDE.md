@@ -199,8 +199,8 @@ ohne dass jemand hineingesehen hat, und am 22.8. noch einmal 43.
   «More of your lovely PRs please.»); stabil ist nur der Satz davor. Der
   Infokasten, den Codex unter jeden Review setzt, behauptet weiterhin eine
   Reaktion («otherwise it will react with 👍») — am 23.8. kam in sechs Repos
-  die Meldung und in keinem die Reaktion. Der Kasten war damit keine Quelle;
-  wie belastbar dieser Befund ist, steht am Ende des Abschnitts.
+  die Meldung und in keinem die Reaktion. Dieser Befund hat sich am 29.8. nicht
+  gehalten — was am Ende des Abschnitts gemessen ist, erklärt ihn anders.
 - **Der PR ist ein Draft** — darauf läuft Codex nicht an.
 - **Das Kontingent ist weg** — dann schreibt er die Meldung oben.
 - **Für das Repo fehlt eine Environment** — dann schreibt er:
@@ -221,10 +221,12 @@ Vermutung über die Reihenfolge.
 Praktisch heisst das: **Eine verschwundene Limit-Meldung ist keine Entwarnung.**
 Sie kann bedeuten, dass das Kontingent wieder da ist — und dass jetzt etwas
 anderes den Review verhindert. Belegt ist eine Prüfung erst durch ein
-Review-Objekt, eine Befundlos-Meldung **oder** den Statuskommentar weiter unten.
-Wer nur das Objekt gelten lässt,
-zählt jeden befundlosen Review als ungeprüft — und baut sich denselben Fehlalarm
-ein, den dieser Abschnitt verhindern soll, nur in die andere Richtung.
+Review-Objekt, eine Befundlos-Meldung **oder** einen Statuskommentar auf
+`✅ Completed` — der Zustand gehört zur Bedingung, nicht bloss die Form: derselbe
+Kommentar steht direkt nach dem Umschalten auf `🔄 Running` und belegt dann
+nichts als den Start. Wer nur das Objekt gelten lässt, zählt jeden befundlosen
+Review als ungeprüft — und baut sich denselben Fehlalarm ein, den dieser
+Abschnitt verhindern soll, nur in die andere Richtung.
 
 «Kein Kommentar» heisst also nicht «geprüft und sauber». Unterscheiden lässt es
 sich an der Form: Ein Review **mit** Befund ist ein Review-Objekt
@@ -280,24 +282,38 @@ Drei Dinge, die man dabei auseinanderhalten muss:
   binnen anderthalb Minuten erst «läuft» und dann «fertig». Was man vorhin
   gelesen hat, ist deshalb kein Befund, sondern ein Zwischenstand — vor dem
   Urteil neu abfragen.
-- **Eine Beobachtung ist keine Regel.** Belegt ist diese Form für ein Repo, einen
-  PR, einen Tag. Ob jedes Repo sie bekommt, ist offen; ihr Fehlen ist vorerst
+- **Er ersetzt das Review-Objekt nicht.** Am selben Tag lief #79 mit Befund: da
+  standen Statuskommentar **und** Review-Objekt nebeneinander. Der Kommentar
+  kam bei beiden Läufen, das Objekt nur beim Lauf mit Befund. Beide Abfragen
+  bleiben also nötig, der Kommentar erspart keine.
+- **Zwei Läufe sind noch keine Regel.** Belegt ist die Form für ein Repo, zwei
+  PRs, einen Tag. Ob jedes Repo sie bekommt, ist offen; ihr Fehlen ist vorerst
   kein Gegenbeweis, und ein Repo ohne sie fällt zurück auf die vier Fälle oben.
 
-Der Infokasten wurde derweil umgeschrieben und verspricht jetzt zwei Reaktionen:
-👀 während des Laufs, 👍 nach einem Lauf ohne Befund. Und diesmal war eine da:
-der PR trug am Ende `reactions: {"+1": 1}`. Das ist der erste Beleg überhaupt
-dafür, und er trägt nur bis zu einer Grenze — wer sie gesetzt hat, sagt die
-Antwort nicht; ein Daumen des Autors sieht in `reactions` genauso aus. Der
-Kasten ist damit nicht bestätigt, nur nicht mehr widerlegt.
+Der Infokasten wurde derweil umgeschrieben und verspricht zwei Reaktionen:
+👀 während des Laufs, 👍 nach einem Lauf ohne Befund. Beide Hälften sind am
+29.8. gemessen worden, und beide stimmen:
 
-**Die Reaktion sitzt am PR, nicht am Statuskommentar.** Daran bin ich selbst
-hängengeblieben: `reactions` am Kommentar liefert `total_count: 0`, und das
-sieht aus wie ein Ausbleiben. Es ist aber keine Messung des Versprechens,
-sondern eine Messung am falschen Objekt — und stand deshalb zwei Stunden lang
-falsch in der Beschreibung von #77. Ob die sechs Beobachtungen vom 23.8. am PR
-oder am Kommentar entstanden sind, geht aus dem Eintrag oben nicht hervor; bevor
-jemand «der Kasten ist keine Quelle» weiterträgt, gehört das nachgemessen.
+| PR  | Lauf                | `reactions` am PR                  |
+| --- | ------------------- | ---------------------------------- |
+| #79 | während des Laufs   | `eyes: 1`                          |
+| #79 | fertig, mit Befund  | `total_count: 0` — 👀 wieder weg    |
+| #77 | fertig, ohne Befund | `+1: 1`                            |
+
+Damit ist der Kasten in diesem Punkt **bestätigt**, nicht bloss unwiderlegt.
+Wichtig daran ist das mittlere Feld: **die 👀 wird nach dem Lauf wieder
+entfernt.** Eine Reaktion, die man nicht findet, kann deshalb dreierlei heissen
+— es lief nie etwas, es lief und fand etwas, oder man hat zu spät gesehen.
+
+**Und sie sitzt am PR, nicht am Statuskommentar.** Daran bin ich selbst
+hängengeblieben: `reactions` am Kommentar liefert immer `total_count: 0`, und
+das sieht aus wie ein Ausbleiben. Es ist aber keine Messung des Versprechens,
+sondern eine am falschen Objekt — und stand deshalb zwei Stunden lang falsch in
+der Beschreibung von #77. Beides zusammen erklärt die sechs Repos vom 23.8.
+zwanglos: am Kommentar gemessen oder nach einem Lauf mit Befund gesehen, und
+schon fehlt die Reaktion, ohne dass jemand sein Versprechen gebrochen hätte.
+Der Satz «der Kasten ist keine Quelle» stützt sich damit auf eine Messung, die
+ihn nicht mehr trägt.
 
 Und ein befundloser Lauf ist kein Freispruch. Am 23.8. lief derselbe Text durch
 42 Reviews: 36 meldeten denselben P2-Befund, 6 die Befundlos-Meldung — gleiche
