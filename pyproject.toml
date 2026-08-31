@@ -52,7 +52,7 @@ dev = [
     # frisches `pip install -e ".[dev]"` zog damit die jeweils neuste ruff, und
     # die meldete Abweichungen, die niemand verursacht hatte. Ein Bump gehört in
     # einen eigenen Commit, zusammen mit den Formatierungen, die er auslöst.
-    "ruff==0.16.4",
+    "ruff==0.16.5",
 ]
 
 [project.scripts]
