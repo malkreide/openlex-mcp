@@ -16,7 +16,7 @@
 - Non-root multi-stage Docker container with HEALTHCHECK + `compose.yml` resource limits
 - `pydantic-settings` `Settings` class + `MCP_TRANSPORT` env var
 - `openlex__` tool namespace prefix + `docs/tool-hashes.json` release snapshot
-- `MCP_PROTOCOL_VERSION` pinned + Dependabot weekly PRs
+- `MCP_PROTOCOL_VERSION` pinned + Dependabot PRs (monthly, grouped)
 - Pydantic `strict=True` input validation + 89-test CI suite (Python 3.11 / 3.12 / 3.13)
 - `ctx.report_progress()` / `ctx.info()` / `ctx.warning()` in `zhlaw_update_cache` (SDK-003)
 - Structured logging — `structlog` JSON output to stderr, per-call bound context (OBS-003)

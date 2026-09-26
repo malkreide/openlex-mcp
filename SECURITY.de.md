@@ -88,4 +88,4 @@ validierten OAuth-`sub`-Claim gebunden werden.
 Diese Richtlinie deckt den Code des `openlex-mcp`-Servers ab. Sicherheitslücken in
 vorgelagerten Datenquellen (HuggingFace, zh.ch) oder in Drittanbieter-Abhängigkeiten
 sollten den jeweiligen Maintainern gemeldet werden; Abhängigkeits-Updates werden
-über wöchentliche Dependabot-PRs verfolgt.
+über monatliche, gebündelte Dependabot-PRs verfolgt.

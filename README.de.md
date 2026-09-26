@@ -286,7 +286,7 @@ openlex-mcp/
 ├── scripts/gen_tool_hashes.py   # Hash-Snapshot der Tool-Definitionen (SEC-022)
 ├── docs/                        # network-egress, secret-management, tool-hashes
 ├── .github/workflows/ci.yml     # GitHub Actions (Python 3.11/3.12/3.13)
-├── .github/dependabot.yml       # Wöchentliche Dependency-PRs (ARCH-012)
+├── .github/dependabot.yml       # Monatliche, gebündelte Dependency-PRs (ARCH-012)
 ├── Dockerfile                   # Gehärteter Multi-Stage-Build (SEC-007/SCALE-004)
 ├── compose.yml                  # Ressourcenlimits für lokale Tests (SCALE-006)
 ├── pyproject.toml

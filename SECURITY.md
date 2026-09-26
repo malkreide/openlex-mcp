@@ -87,4 +87,4 @@ sessions to the validated OAuth `sub` claim before deployment.
 This policy covers the `openlex-mcp` server code. Vulnerabilities in upstream
 data sources (HuggingFace, zh.ch) or in third-party dependencies should be
 reported to their respective maintainers; dependency updates are tracked via
-weekly Dependabot PRs.
+monthly grouped Dependabot PRs.
