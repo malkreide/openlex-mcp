@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-27
+
+Der erste Release seit 0.2.5. Er sammelt alles, was seither auf `master`
+gelandet ist; wer über `uvx openlex-mcp` installiert, erhält es erst mit dieser
+Version. Die Schwerpunkte, nach Tragweite:
+
+- **Jede Antwort nennt den Stand des Bestands** (`corpus_as_of`, 2023-01-01),
+  und Aufhebungen nach dem Stichtag werden markiert. Ohne das konnte ein Modell
+  einen Wortlaut von 2023 als geltendes Recht ausgeben.
+- **Browser-Clients bestehen den CORS-Preflight** — die Routing-Header von Spec
+  `2026-07-28` sind freigegeben.
+- **Retry-Politik gegenüber zh.ch** begrenzt, gestreut und `Retry-After`-treu
+  (`ARCH-014`).
+- **Spec `2026-07-28` nativ:** kein abgekündigtes Logging mehr (SEP-2577),
+  `serverInfo.version` gesetzt, Frischehinweise auf allen auflistenden
+  Methoden, Protokoll-Pin gegen das SDK gesichert.
+
+Die Minor-Stelle steigt, weil die Tool-Antworten neue Felder tragen und sich
+das Verhalten gegenüber 0.2.5 sichtbar ändert. Die Einzelheiten folgen.
+
 ### Changed
 
 - **Spec `2026-07-28` nativ: keine abgekündigte API mehr.**
