@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Spec `2026-07-28` nativ: keine abgekündigte API mehr.**
+  `openlex__zhlaw_update_cache` meldete Start, Erfolg und Fehler über
+  `ctx.info`/`ctx.warning`. Die Logging-Fähigkeit ist mit dieser Spec
+  abgekündigt (SEP-2577): Jeder Aufruf warf zwei `MCPDeprecationWarning`s, und
+  auf einer modernen Verbindung kam die Meldung nur an, wenn der Client sie pro
+  Anfrage per `_meta` bestellt hatte. Der Status steht ohnehin im Resultat
+  (`results[0].status`, `message`); die Diagnose geht jetzt ins strukturierte
+  Server-Log. `report_progress` bleibt — Fortschritt ist nicht abgekündigt.
+
+### Fixed
+
+- **`server/discover` meldete `serverInfo.version: ""`.** Das SDK setzt bewusst
+  keine eigene Version ein, und `MCPServer(...)` bekam keine. Jetzt steht dort
+  die Paketversion aus `openlex_mcp.__version__`.
+
+- **`prompts/list`, `resources/list` und `resources/templates/list` trugen
+  «sofort veraltet».** Der Kommentar bei `CACHE_HINTS` liess sie weg, weil der
+  Server weder Prompts noch Ressourcen registriert. Nachgemessen bedient
+  `MCPServer` alle drei Methoden trotzdem, und `server/discover` kündigt
+  `prompts` und `resources` als Fähigkeiten an — ein Client, der dem folgt,
+  fragte die leere Liste bei jeder Verbindung neu ab. Sie tragen jetzt denselben
+  Hinweis wie `tools/list`. `tests/test_spec_2026_07_28.py` prüft zuerst die
+  Prämisse (die Ankündigung) und fällt, sobald sie wegfällt.
+
+### Docs
+
+- **Skalierung nach Ära getrennt.** Die README beschrieb Session-State als
+  generelle Einschränkung. Eine `2026-07-28`-Anfrage läuft ohne
+  `Mcp-Session-Id` und ist zustandslos; die Ein-Instanz-Grenze gilt nur noch für
+  Handshake-Clients.
+
 ### Fixed
 
 - **Der Tool-Hash-Schnappschuss hashte SDK-Interna statt des Vertrags.**

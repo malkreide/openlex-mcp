@@ -88,7 +88,7 @@ async def test_search_articles(server_with_cache):
 
 
 # ---------------------------------------------------------------------------
-# SDK-003: context injection — progress reports and info messages
+# SDK-003: context injection — progress reports
 # ---------------------------------------------------------------------------
 
 
@@ -101,7 +101,7 @@ def _ctx() -> MagicMock:
 
 
 @pytest.mark.asyncio
-async def test_update_cache_reports_progress_and_info(server_with_cache, monkeypatch):
+async def test_update_cache_reports_progress_ohne_logging(server_with_cache, monkeypatch):
     """SDK-003: der Kontext wird bedient — mit gestubbtem Download.
 
     Vorher rief dieser Test `load_from_huggingface` ungebremst auf und lud ~970
@@ -124,7 +124,10 @@ async def test_update_cache_reports_progress_and_info(server_with_cache, monkeyp
 
     resp = await srv.zhlaw_update_cache(ctx, srv.UpdateCacheInput(force=False))
 
-    ctx.info.assert_called()
+    # Spec 2026-07-28 kuendigt die Logging-Faehigkeit ab (SEP-2577); was der
+    # Client wissen muss, steht im Resultat.
+    ctx.info.assert_not_called()
+    ctx.warning.assert_not_called()
     # Start und Abschluss werden gemeldet.
     assert ctx.report_progress.call_count >= 2
     assert resp.result_type == "cache_status"

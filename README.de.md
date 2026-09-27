@@ -241,12 +241,12 @@ Alle 8 Endpunkte werden als **Tools** statt als MCP Resources bereitgestellt. Be
 
 ### Skalierungs-Einschränkungen
 
-Der Streamable-HTTP-Transport hält den Session-State **prozessintern** (FastMCP-Default). Das hat zwei Konsequenzen:
+Die Einschränkung hängt von der Protokoll-Ära ab, die der Client spricht:
 
-- **Nur eine Instanz** — horizontale Skalierung (mehrere Replicas) bricht aktive Sessions, da es keinen geteilten Session-Store (Redis, Durable Objects etc.) gibt.
-- **Kein Sticky-Session-LB nötig (heute)** — ein Single-Replica-Render-Deployment leitet alle Anfragen naturgemäss an einen Prozess.
+- **`2026-07-28` (modern)** — jede Anfrage ist ein in sich geschlossener POST mit eigenem `_meta`-Envelope; der Server antwortet ohne `Mcp-Session-Id` und hält zwischen den Anfragen keinen Zustand. Jede Replica kann jede Anfrage beantworten — kein geteilter Store, kein Sticky-Routing. (`subscriptions/listen`-Streams leben auf der Replica, die sie geöffnet hat; die Listen dieses Servers stehen beim Import fest, es gibt also nichts zu verteilen.)
+- **Handshake-Ära (`initialize`, bis `2025-11-25`)** — der Session-State liegt **prozessintern**. Mehrere Replicas brechen aktive Sessions, da es keinen geteilten Session-Store (Redis, Durable Objects etc.) gibt. Ein Single-Replica-Render-Deployment leitet alle Anfragen an einen Prozess, ein Sticky-Session-LB ist heute also nicht nötig.
 
-Vor der Skalierung über eine Instanz hinaus: entweder einen geteilten Session-Store ergänzen **oder** den Edge-Load-Balancer so konfigurieren, dass er anhand des Headers `Mcp-Session-Id` mit einer Stick-Table und passender TTL routet.
+Bevor Handshake-Clients über eine Instanz hinaus skaliert werden: entweder einen geteilten Session-Store ergänzen **oder** den Edge-Load-Balancer so konfigurieren, dass er anhand des Headers `Mcp-Session-Id` mit einer Stick-Table und passender TTL routet.
 
 ---
 
@@ -258,6 +258,9 @@ Vor der Skalierung über eine Instanz hinaus: entweder einen geteilten Session-S
 | **Über den Pro-Request-Envelope bedient** | **`2026-07-28`** |
 | **Wer entscheidet** | Die erste Anfrage des Clients, einmal pro Verbindung. Eine Anfrage mit dem `2026-07-28`-`_meta`-Envelope öffnet eine moderne Verbindung, alles andere eine Handshake-Verbindung. |
 | **SDK** | `mcp[cli]>=2.0.0,<3` |
+| **Cache-Hinweise** | `tools/list`, `prompts/list`, `resources/list`, `resources/templates/list` und `server/discover`: `ttlMs` 300000, `cacheScope` `public` |
+| **`serverInfo.version`** | Die Paketversion (`openlex_mcp.__version__`), in jeder `server/discover`-Antwort |
+| **In `2026-07-28` abgekündigt, nicht genutzt** | Logging (`ctx.info`/`ctx.warning`, SEP-2577) — Status steht im Tool-Resultat, Diagnose im Server-Log |
 | **Verankert in** | `src/openlex_mcp/server.py` — Konstante `MCP_PROTOCOL_VERSION` |
 
 ### Update-Politik

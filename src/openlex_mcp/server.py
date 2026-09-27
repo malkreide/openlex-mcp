@@ -32,7 +32,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from openlex_mcp import api_client
+from openlex_mcp import __version__, api_client
 from openlex_mcp.data_cache import LawCache
 from openlex_mcp.law_parser import (
     Article,
@@ -183,18 +183,33 @@ async def app_lifespan(server: MCPServer) -> AsyncIterator[AppContext]:
 # Sobald eine Liste vom Aufrufer abhaengt, muss der Scope im selben Commit auf
 # `private` wechseln.
 #
-# `prompts/list` und `resources/list` bleiben ungesetzt: dieser Server
-# registriert weder Prompts noch Ressourcen, und ein Hinweis darauf beschriebe
-# eine Flaeche, die es nicht gibt.
+# `prompts/list`, `resources/list` und `resources/templates/list` stehen
+# ebenfalls hier. Bis zu diesem Commit fehlten sie mit der Begruendung, der
+# Server registriere weder Prompts noch Ressourcen, ein Hinweis beschriebe also
+# eine Flaeche, die es nicht gibt. Nachgemessen gibt es sie: `MCPServer` bedient
+# alle drei Methoden immer (mit leerer Liste), und `server/discover` kuendigt
+# `prompts` und `resources` als Faehigkeiten an. Ein Client, der dem folgt,
+# bekam eine leere Liste mit «sofort veraltet» und fragte bei jeder Verbindung
+# erneut. Leer ist die Liste aus demselben Grund wie die Tool-Liste fest: es
+# wird beim Import nichts registriert. `resources/read` ist Inhalt, kein
+# Verzeichnis, und bleibt draussen.
 LIST_CACHE_TTL_MS = 300_000
 
+_LIST_HINT = CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public")
 CACHE_HINTS = {
-    "tools/list": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),
-    "server/discover": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),
+    "tools/list": _LIST_HINT,
+    "prompts/list": _LIST_HINT,
+    "resources/list": _LIST_HINT,
+    "resources/templates/list": _LIST_HINT,
+    "server/discover": _LIST_HINT,
 }
 
 mcp = MCPServer(
     "openlex_mcp",
+    # Landet in `serverInfo` — bei `2026-07-28` im `_meta` jeder
+    # `server/discover`-Antwort. Ohne das Argument meldete der Server dort
+    # `"version": ""`: das SDK setzt bewusst keine eigene ein.
+    version=__version__,
     cache_hints=CACHE_HINTS,
     instructions=(
         "MCP-Server für die Zürcher Gesetzessammlung (ZH-Lex / Kanton Zürich). "
@@ -1000,7 +1015,13 @@ async def zhlaw_update_cache(ctx: Context, params: UpdateCacheInput) -> CacheSta
     tlog = tool_logger("zhlaw_update_cache")
     try:
         tlog.info("tool_call", force=params.force)
-        await ctx.info("Cache-Update gestartet — prüfe Aktualität…")
+        # Kein `ctx.info`/`ctx.warning` mehr: Die Logging-Faehigkeit ist mit
+        # Spec 2026-07-28 abgekuendigt (SEP-2577). Auf einer modernen
+        # Verbindung kommt eine solche Meldung nur an, wenn der Client sie pro
+        # Anfrage per `_meta` bestellt — sonst gar nicht. Was der Client wissen
+        # muss, steht deshalb im Resultat (`message`/`detail`), was der Betrieb
+        # wissen muss, im Server-Log. Fortschritt bleibt: der ist nicht
+        # abgekuendigt und haengt am Progress-Token der Anfrage selbst.
         cache = _get_cache()
         await ctx.report_progress(progress=0, total=1)
         result = cache.load_from_huggingface(force=params.force)
@@ -1012,7 +1033,7 @@ async def zhlaw_update_cache(ctx: Context, params: UpdateCacheInput) -> CacheSta
 
         if status == "cache_fresh":
             count = result.get("total", 0)
-            await ctx.info(f"Cache ist aktuell — {count} Gesetze im Cache.")
+            tlog.info("cache_fresh", total=count)
             item = CacheStatusItem(
                 status="cache_fresh",
                 total=count,
@@ -1021,7 +1042,7 @@ async def zhlaw_update_cache(ctx: Context, params: UpdateCacheInput) -> CacheSta
         elif status == "ok":
             loaded = result["loaded"]
             duration = result["duration_s"]
-            await ctx.info(f"Cache-Update abgeschlossen: {loaded} Gesetze in {duration}s geladen.")
+            tlog.info("cache_update_ok", loaded=loaded, duration_s=duration)
             item = CacheStatusItem(
                 status="ok",
                 loaded=loaded,
@@ -1031,7 +1052,6 @@ async def zhlaw_update_cache(ctx: Context, params: UpdateCacheInput) -> CacheSta
             )
         elif status == "error":
             msg = result.get("message", "Unbekannter Fehler")
-            await ctx.warning(f"Cache-Update fehlgeschlagen: {msg}")
             tlog.warning("cache_update_error", detail=msg)
             item = CacheStatusItem(status="error", detail=msg)
         else:

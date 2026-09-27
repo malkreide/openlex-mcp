@@ -241,12 +241,12 @@ All 8 endpoints are exposed as **Tools** rather than MCP Resources. Rationale:
 
 ### Scaling Constraints
 
-The Streamable-HTTP transport keeps session state **in-process** (FastMCP default). This has two implications:
+The constraint depends on the protocol era the client speaks:
 
-- **Single-instance only** — horizontal scaling (multiple replicas) breaks active sessions because there is no shared session store (Redis, Durable Objects, etc.).
-- **No sticky-session LB needed today** — a single-replica Render deployment naturally routes all requests to one process.
+- **`2026-07-28` (modern)** — every request is a self-contained POST carrying its own `_meta` envelope; the server answers without issuing an `Mcp-Session-Id` and keeps no session between requests. Any replica can answer any request; no shared store, no sticky routing. (`subscriptions/listen` streams live on the replica that opened them — this server's lists are fixed at import, so there is nothing to fan out.)
+- **Handshake era (`initialize`, up to `2025-11-25`)** — session state is kept **in-process**. Multiple replicas break active sessions because there is no shared session store (Redis, Durable Objects, etc.). A single-replica Render deployment routes all requests to one process, so no sticky-session LB is needed today.
 
-Before scaling beyond one instance: either add a shared session store **or** configure your edge load balancer to route on the `Mcp-Session-Id` header with a stick-table and an appropriate TTL.
+Before scaling handshake-era clients beyond one instance: either add a shared session store **or** configure your edge load balancer to route on the `Mcp-Session-Id` header with a stick-table and an appropriate TTL.
 
 ---
 
@@ -258,7 +258,9 @@ Before scaling beyond one instance: either add a shared session store **or** con
 | **Served via the per-request envelope** | **`2026-07-28`** |
 | **Who picks** | The client's first request, once per connection. A request carrying the `2026-07-28` `_meta` envelope opens a modern connection; anything else opens a handshake connection. |
 | **SDK** | `mcp[cli]>=2.0.0,<3` |
-| **Cache hints** | `tools/list` and `server/discover`: `ttlMs` 300000, `cacheScope` `public` |
+| **Cache hints** | `tools/list`, `prompts/list`, `resources/list`, `resources/templates/list` and `server/discover`: `ttlMs` 300000, `cacheScope` `public` |
+| **`serverInfo.version`** | The package version (`openlex_mcp.__version__`), in every `server/discover` result |
+| **Deprecated in `2026-07-28`, not used** | Logging (`ctx.info`/`ctx.warning`, SEP-2577) — status goes into the tool result, diagnostics into the server log |
 | **Pinned in** | `src/openlex_mcp/server.py` — `MCP_PROTOCOL_VERSION` constant |
 
 ### Update policy
