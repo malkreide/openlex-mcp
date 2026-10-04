@@ -215,5 +215,10 @@ async def test_live_update_cache(live_server):
     assert resp.results[0].status == "cache_fresh", (
         f"Expected cache_fresh, got {resp.results[0].status}: {resp.results[0].detail}"
     )
-    ctx.info.assert_called()
+    # Spec 2026-07-28 kuendigt die Logging-Faehigkeit ab (SEP-2577); der
+    # Status steht im Resultat, nicht in einer Log-Meldung an den Client.
+    # Seit 0.3.0 hielt diese Zeile noch `ctx.info.assert_called()` fest und
+    # machte die naechtliche Suite rot, waehrend der Unit-Test schon nachzog.
+    ctx.info.assert_not_called()
+    ctx.warning.assert_not_called()
     assert ctx.report_progress.call_count >= 2
