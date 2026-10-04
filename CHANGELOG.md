@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die nächtliche Live-Suite ist wieder grün.** `test_live_update_cache`
+  verlangte seit 0.3.0 weiterhin `ctx.info` — die Meldung, die 0.3.0 gemäss
+  Spec `2026-07-28` (SEP-2577) bewusst entfernt hatte. Der Unit-Test war
+  nachgezogen worden, der Live-Test nicht; seit dem 28.9. war jeder Lauf rot.
+  Er prüft jetzt dasselbe wie der Unit-Test: kein `ctx.info`/`ctx.warning`,
+  Fortschritt weiterhin gemeldet.
+
 ## [0.3.0] - 2026-09-27
 
 Der erste Release seit 0.2.5. Er sammelt alles, was seither auf `master`
